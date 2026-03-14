@@ -3,7 +3,7 @@ import './globals.css'
 import { Toaster } from 'sonner'
 
 export const metadata: Metadata = {
-  title: '우리 클라우드',
+  title: 'BIN CLOUD',
   description: '가족과 함께하는 개인 클라우드',
 }
 

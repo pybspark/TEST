@@ -11,7 +11,7 @@ const navItems = [
   { href: '/dashboard/files', label: '파일', icon: FileText },
   { href: '/dashboard/videos', label: '영상', icon: Video },
   { href: '/dashboard/notes', label: '메모', icon: StickyNote },
-  { href: '/dashboard/family', label: '가족 관리', icon: Users },
+  { href: '/dashboard/family', label: '멤버 관리', icon: Users },
 ]
 
 interface SidebarProps {
@@ -44,7 +44,7 @@ export default function Sidebar({ user, usedBytes = 0, totalBytes = 10 * 1024 * 
           <div className="w-7 h-7 bg-brand-600 rounded-lg flex items-center justify-center flex-shrink-0">
             <Cloud className="w-4 h-4 text-white" />
           </div>
-          <span className="font-semibold text-gray-900 text-sm">우리 클라우드</span>
+          <span className="font-semibold text-gray-900 text-sm">BIN CLOUD</span>
         </div>
       </div>
 

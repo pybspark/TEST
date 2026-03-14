@@ -1,0 +1,31 @@
+@import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable.min.css');
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --sidebar-width: 220px;
+}
+
+* {
+  -webkit-font-smoothing: antialiased;
+}
+
+body {
+  @apply bg-gray-50 text-gray-900;
+  font-family: 'Pretendard Variable', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+}
+
+/* 스크롤바 커스텀 */
+::-webkit-scrollbar { width: 4px; height: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { @apply bg-gray-300 rounded-full; }
+
+/* 사진 grid hover 효과 */
+.photo-card:hover .photo-overlay { opacity: 1; }
+
+/* 파일 row hover */
+.file-row:hover { @apply bg-blue-50; }
+
+/* 드래그 앤 드롭 zone */
+.drop-zone-active { @apply border-brand-600 bg-brand-50; }

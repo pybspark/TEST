@@ -48,8 +48,8 @@ export default function LoginPage() {
           <div className="inline-flex items-center justify-center w-14 h-14 bg-brand-600 rounded-2xl mb-4 shadow-lg">
             <Cloud className="w-7 h-7 text-white" />
           </div>
-          <h1 className="text-2xl font-bold text-gray-900">우리 클라우드</h1>
-          <p className="text-gray-500 text-sm mt-1">가족과 함께하는 개인 클라우드</p>
+          <h1 className="text-2xl font-bold text-gray-900">BIN CLOUD</h1>
+          <p className="text-gray-500 text-sm mt-1">빈의 개인 클라우드</p>
         </div>
 
         {/* 탭 */}
@@ -73,7 +73,7 @@ export default function LoginPage() {
             <div className="relative">
               <input
                 type="text"
-                placeholder="이름 (예: 아빠, 엄마)"
+                placeholder="이름"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 required
@@ -117,7 +117,7 @@ export default function LoginPage() {
 
         {/* 초대 코드로 가입 */}
         <p className="text-center text-xs text-gray-400 mt-6">
-          가족에게 초대받으셨나요?{' '}
+          지인에게 초대받으셨나요?{' '}
           <a href="/invite" className="text-brand-600 font-medium">초대 코드 입력</a>
         </p>
       </div>

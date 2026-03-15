@@ -13,6 +13,8 @@ interface ShareGroupDropdownProps {
   loading?: boolean
   className?: string
   title?: string
+  /** 모달 하단 등에서 드롭다운이 잘릴 때 true 로 위쪽으로 열기 */
+  openUpward?: boolean
 }
 
 export default function ShareGroupDropdown({
@@ -24,6 +26,7 @@ export default function ShareGroupDropdown({
   loading,
   className = '',
   title,
+  openUpward = false,
 }: ShareGroupDropdownProps) {
   const [open, setOpen] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
@@ -50,7 +53,11 @@ export default function ShareGroupDropdown({
         <Share2 className="w-3.5 h-3.5" />
       </button>
       {open && (
-        <div className="absolute right-0 top-full mt-1 py-1 bg-white border border-gray-200 rounded-xl shadow-lg z-50 min-w-[160px]">
+        <div
+          className={`absolute right-0 py-1 bg-white border border-gray-200 rounded-xl shadow-lg z-[100] min-w-[160px] ${
+            openUpward ? 'bottom-full mb-1' : 'top-full mt-1'
+          }`}
+        >
           <p className="px-3 py-1.5 text-xs text-gray-500 border-b border-gray-100">공유할 그룹 선택</p>
           {groups.map((g) => (
             <button

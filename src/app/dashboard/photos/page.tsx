@@ -16,6 +16,7 @@ interface FileRecord {
   created_at: string
   is_shared: boolean
   group_id: string | null
+  profiles?: { name: string | null }
 }
 
 export default function PhotosPage() {
@@ -31,7 +32,7 @@ export default function PhotosPage() {
     if (!user) return
     const { data } = await supabase
       .from('files')
-      .select('*')
+      .select('*, profiles(name)')
       .eq('owner_id', user.id)
       .eq('file_type', 'photo')
       .order('created_at', { ascending: false })
@@ -133,26 +134,36 @@ export default function PhotosPage() {
           onClick={() => setSelected(null)}
         >
           <div
-            className="bg-white rounded-2xl overflow-hidden max-w-2xl w-full max-h-[90vh] flex flex-col"
+            className="bg-white rounded-2xl overflow-visible max-w-2xl w-full max-h-[90vh] flex flex-col"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="relative flex-1 min-h-0">
+            <div className="relative flex-1 min-h-[40vh] flex items-center justify-center bg-gray-50 overflow-hidden">
               <img
                 src={getFileUrl('family-files', selectedPhoto.storage_path)}
-                alt={selectedPhoto.name}
-                className="w-full max-h-[60vh] object-contain bg-gray-50"
+                alt="사진"
+                className="max-w-full max-h-[70vh] w-auto h-auto object-contain"
               />
             </div>
-            <div className="p-4 border-t border-gray-100">
-              <p className="font-medium text-gray-900 text-sm truncate mb-3">{selectedPhoto.name}</p>
+            <div className="p-4 border-t border-gray-100 flex-shrink-0 relative">
+              <p className="text-xs mb-3 flex items-center gap-1.5">
+                <Share2 className={`w-3.5 h-3.5 flex-shrink-0 ${selectedPhoto.is_shared ? 'text-brand-500' : 'text-gray-400'}`} />
+                {selectedPhoto.is_shared && selectedPhoto.group_id ? (
+                  <span className="font-medium text-brand-600">
+                    {groups.find((g) => g.id === selectedPhoto.group_id)?.name || '그룹'}에 공유됨
+                  </span>
+                ) : (
+                  <span className="text-gray-400">공유 안 함</span>
+                )}
+              </p>
               <div className="flex gap-2">
-                <div className="flex-1 flex items-center justify-center">
+                <div className="flex-1 flex items-center justify-center relative">
                   <ShareGroupDropdown
                     isShared={selectedPhoto.is_shared}
                     sharedGroupId={selectedPhoto.group_id}
                     groupName={selectedPhoto.group_id ? groups.find((g) => g.id === selectedPhoto.group_id)?.name : null}
                     groups={groups}
                     onSelect={(groupId) => setShareGroup(selectedPhoto.id, groupId)}
+                    openUpward
                     className={`flex items-center justify-center gap-2 py-2 px-4 rounded-xl text-sm font-medium transition-colors ${
                       selectedPhoto.is_shared ? 'bg-brand-50 text-brand-600' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
                     }`}
@@ -160,7 +171,7 @@ export default function PhotosPage() {
                 </div>
                 <a
                   href={getFileUrl('family-files', selectedPhoto.storage_path)}
-                  download={selectedPhoto.name}
+                  download={`사진-${selectedPhoto.id.slice(0, 8)}.jpg`}
                   className="flex-1 flex items-center justify-center gap-2 py-2 bg-gray-100 text-gray-600 rounded-xl text-sm font-medium hover:bg-gray-200 transition-colors"
                 >
                   <Download className="w-3.5 h-3.5" />

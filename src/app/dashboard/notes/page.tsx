@@ -17,6 +17,7 @@ interface Note {
   is_shared: boolean
   group_id: string | null
   updated_at: string
+  profiles?: { name: string | null }
 }
 
 const COLORS: Record<string, { bg: string; border: string; label: string }> = {
@@ -39,7 +40,7 @@ export default function NotesPage() {
     if (!user) return
     const { data } = await supabase
       .from('notes')
-      .select('*')
+      .select('*, profiles(name)')
       .eq('owner_id', user.id)
       .order('pinned', { ascending: false })
       .order('updated_at', { ascending: false })
@@ -163,7 +164,12 @@ export default function NotesPage() {
                   <span className="text-xs text-gray-400">
                     {formatDistanceToNow(new Date(note.updated_at), { addSuffix: true, locale: ko })}
                   </span>
-                  {note.is_shared && <Share2 className="w-3 h-3 text-brand-500" />}
+                  <span className={`text-xs flex items-center gap-1 ${note.is_shared ? 'text-brand-600' : 'text-gray-400'}`}>
+                    <Share2 className="w-3 h-3 flex-shrink-0" />
+                    {note.is_shared && note.group_id
+                      ? `${groups.find((g) => g.id === note.group_id)?.name || '그룹'}에 공유됨`
+                      : '공유 안 함'}
+                  </span>
                 </div>
               </div>
             )
@@ -225,6 +231,14 @@ export default function NotesPage() {
               />
             </div>
 
+            <div className="px-4 pb-2">
+              <p className={`text-xs flex items-center gap-1.5 ${editing.is_shared ? 'text-brand-600' : 'text-gray-400'}`}>
+                <Share2 className="w-3 h-3 flex-shrink-0" />
+                {editing.is_shared && editing.group_id
+                  ? `${groups.find((g) => g.id === editing.group_id)?.name || '그룹'}에 공유됨`
+                  : '공유 안 함'}
+              </p>
+            </div>
             <div className="flex items-center justify-between px-4 pb-4 gap-2">
               {!isNew && (
                 <button

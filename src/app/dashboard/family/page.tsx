@@ -1,8 +1,11 @@
 'use client'
 import { useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
-import { Users, UserPlus, Crown, CheckCircle, Share2 } from 'lucide-react'
+import { Users, UserPlus, Crown, CheckCircle, Share2, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
+
+const ADMIN_EMAIL = 'pybspark@gmail.com'
 
 interface Member {
   id: string
@@ -29,61 +32,85 @@ interface SharedItem {
 }
 
 export default function FamilyPage() {
+  const [groups, setGroups] = useState<Group[]>([])
+  const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null)
   const [group, setGroup] = useState<Group | null>(null)
   const [members, setMembers] = useState<Member[]>([])
   const [sharedItems, setSharedItems] = useState<SharedItem[]>([])
   const [loading, setLoading] = useState(true)
   const [currentUserId, setCurrentUserId] = useState<string | null>(null)
   const [groupName, setGroupName] = useState('')
+  const [deleteConfirmGroupId, setDeleteConfirmGroupId] = useState<string | null>(null)
+  const [deleteLoading, setDeleteLoading] = useState(false)
   const supabase = createClient()
+  const router = useRouter()
 
-  async function fetchData() {
+  async function fetchData(overrideGroupId?: string) {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return
+    if (user.email !== ADMIN_EMAIL) {
+      router.replace('/dashboard')
+      return
+    }
     setCurrentUserId(user.id)
 
-    // 내가 속한 그룹 찾기
-    const { data: memberRow } = await supabase
+    // 내가 속한 모든 그룹 찾기
+    const { data: memberRows } = await supabase
       .from('family_members')
       .select('group_id')
       .eq('user_id', user.id)
-      .maybeSingle()
 
-    if (memberRow?.group_id) {
-      // 그룹 정보
-      const { data: grp } = await supabase
-        .from('family_groups')
-        .select('*')
-        .eq('id', memberRow.group_id)
-        .single()
-      setGroup(grp)
-      setGroupName(grp?.name || '')
-
-      // 멤버 목록
-      const { data: mems } = await supabase
-        .from('family_members')
-        .select('*, profiles(name, email, avatar_url)')
-        .eq('group_id', memberRow.group_id)
-      setMembers((mems as Member[]) || [])
-
-      // 이 그룹에 공유된 파일·메모만 (group_id가 이 그룹이거나, 예전 데이터 호환용 group_id 없음)
-      const { data: sFiles } = await supabase
-        .from('files')
-        .select('id, name, file_type, created_at')
-        .eq('is_shared', true)
-        .or(`group_id.eq.${memberRow.group_id},group_id.is.null`)
-        .limit(10)
-      const { data: sNotes } = await supabase
-        .from('notes')
-        .select('id, title, created_at')
-        .eq('is_shared', true)
-        .or(`group_id.eq.${memberRow.group_id},group_id.is.null`)
-        .limit(10)
-      setSharedItems([
-        ...(sFiles || []).map((f) => ({ ...f, type: 'file' as const })),
-        ...(sNotes || []).map((n) => ({ ...n, type: 'note' as const })),
-      ])
+    const groupIds = [...new Set((memberRows || []).map((r) => r.group_id).filter(Boolean))]
+    if (groupIds.length === 0) {
+      setGroups([])
+      setSelectedGroupId(null)
+      setGroup(null)
+      setMembers([])
+      setSharedItems([])
+      setLoading(false)
+      return
     }
+
+    const { data: grpList } = await supabase
+      .from('family_groups')
+      .select('*')
+      .in('id', groupIds)
+      .order('created_at', { ascending: false })
+    setGroups(grpList || [])
+
+    const currentId = overrideGroupId && groupIds.includes(overrideGroupId)
+      ? overrideGroupId
+      : selectedGroupId && groupIds.includes(selectedGroupId)
+        ? selectedGroupId
+        : groupIds[0]
+    setSelectedGroupId(currentId)
+
+    const { data: grp } = await supabase.from('family_groups').select('*').eq('id', currentId).single()
+    setGroup(grp)
+    setGroupName(grp?.name || '')
+
+    const { data: mems } = await supabase
+      .from('family_members')
+      .select('*, profiles(name, email, avatar_url)')
+      .eq('group_id', currentId)
+    setMembers((mems as Member[]) || [])
+
+    const { data: sFiles } = await supabase
+      .from('files')
+      .select('id, name, file_type, created_at')
+      .eq('is_shared', true)
+      .or(`group_id.eq.${currentId},group_id.is.null`)
+      .limit(10)
+    const { data: sNotes } = await supabase
+      .from('notes')
+      .select('id, title, created_at')
+      .eq('is_shared', true)
+      .or(`group_id.eq.${currentId},group_id.is.null`)
+      .limit(10)
+    setSharedItems([
+      ...(sFiles || []).map((f) => ({ ...f, type: 'file' as const })),
+      ...(sNotes || []).map((n) => ({ ...n, type: 'note' as const })),
+    ])
     setLoading(false)
   }
 
@@ -104,6 +131,7 @@ export default function FamilyPage() {
         role: 'owner',
       })
       toast.success('그룹이 생성되었습니다!')
+      setSelectedGroupId(grp.id)
       fetchData()
     }
   }
@@ -113,6 +141,28 @@ export default function FamilyPage() {
     await supabase.from('family_groups').update({ name: groupName }).eq('id', group.id)
     toast.success('그룹 이름이 변경되었습니다')
     fetchData()
+  }
+
+  async function deleteGroup(groupId: string) {
+    setDeleteLoading(true)
+    try {
+      const res = await fetch('/api/group/delete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ groupId }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        toast.error(data.error || '삭제 실패')
+        return
+      }
+      toast.success('그룹이 삭제되었습니다')
+      setDeleteConfirmGroupId(null)
+      setSelectedGroupId(null)
+      fetchData()
+    } finally {
+      setDeleteLoading(false)
+    }
   }
 
   function getInitials(name: string) {
@@ -130,7 +180,7 @@ export default function FamilyPage() {
     )
   }
 
-  if (!group) {
+  if (groups.length === 0) {
     return (
       <div className="p-6 flex flex-col items-center justify-center min-h-[60vh]">
         <div className="w-16 h-16 bg-brand-50 rounded-2xl flex items-center justify-center mb-4">
@@ -153,10 +203,32 @@ export default function FamilyPage() {
 
   return (
     <div className="p-6 max-w-2xl mx-auto space-y-5">
-      <div>
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-xl font-bold text-gray-900">그룹 관리</h1>
-        <p className="text-sm text-gray-500 mt-0.5">그룹을 초대하고 함께 공유하세요</p>
+        <div className="flex items-center gap-2">
+          <select
+            value={selectedGroupId || ''}
+            onChange={(e) => {
+              const id = e.target.value || null
+              setSelectedGroupId(id)
+              if (id) fetchData(id)
+            }}
+            className="px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-brand-400 bg-white"
+          >
+            {groups.map((g) => (
+              <option key={g.id} value={g.id}>{g.name}</option>
+            ))}
+          </select>
+          <button
+            onClick={createGroup}
+            className="flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-brand-600 bg-brand-50 rounded-xl hover:bg-brand-100 transition-colors"
+          >
+            <UserPlus className="w-4 h-4" />
+            새 그룹
+          </button>
+        </div>
       </div>
+      <p className="text-sm text-gray-500 -mt-2">그룹을 선택하거나 새로 만드세요</p>
 
       {/* 그룹 이름 */}
       <div className="bg-white border border-gray-100 rounded-2xl p-5">
@@ -175,7 +247,46 @@ export default function FamilyPage() {
             저장
           </button>
         </div>
+        {group?.owner_id === currentUserId && (
+          <button
+            type="button"
+            onClick={() => setDeleteConfirmGroupId(group.id)}
+            className="mt-3 flex items-center gap-1.5 text-xs text-red-600 hover:text-red-700"
+          >
+            <Trash2 className="w-3.5 h-3.5" />
+            이 그룹 삭제
+          </button>
+        )}
       </div>
+
+      {/* 그룹 삭제 확인 모달 */}
+      {deleteConfirmGroupId && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50" onClick={() => !deleteLoading && setDeleteConfirmGroupId(null)}>
+          <div className="w-full max-w-sm bg-white rounded-2xl p-5 shadow-xl space-y-4" onClick={(e) => e.stopPropagation()}>
+            <h3 className="text-sm font-semibold text-red-600">그룹 삭제</h3>
+            <p className="text-xs text-gray-500">
+              이 그룹을 삭제하면 모든 구성원이 그룹에서 나가며, 그룹만 삭제됩니다. 파일·메모는 그대로 있고, 해당 그룹 공유만 해제됩니다. 삭제 후에는 되돌릴 수 없습니다.
+            </p>
+            <div className="flex gap-2 pt-1">
+              <button
+                type="button"
+                onClick={() => !deleteLoading && setDeleteConfirmGroupId(null)}
+                className="flex-1 py-2.5 text-sm font-medium text-gray-600 bg-gray-100 rounded-xl hover:bg-gray-200"
+              >
+                취소
+              </button>
+              <button
+                type="button"
+                onClick={() => deleteGroup(deleteConfirmGroupId)}
+                disabled={deleteLoading}
+                className="flex-1 py-2.5 text-sm font-medium text-white bg-red-600 rounded-xl hover:bg-red-700 disabled:opacity-50"
+              >
+                {deleteLoading ? '처리 중…' : '삭제'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* 구성원 */}
       <div className="bg-white border border-gray-100 rounded-2xl p-5">

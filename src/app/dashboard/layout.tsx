@@ -14,7 +14,6 @@ export default async function DashboardLayout({ children }: { children: React.Re
     .eq('id', user.id)
     .single()
 
-  // 사용 용량 계산
   const { data: files } = await supabase
     .from('files')
     .select('size_bytes')
@@ -28,7 +27,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
         user={{ email: profile?.email || user.email || '', name: profile?.name }}
         usedBytes={usedBytes}
       />
-      <main className="flex-1 ml-[220px] min-h-screen">
+      <main className="flex-1 md:ml-[220px] min-h-screen pt-14 md:pt-0 pb-16 md:pb-0">
         {children}
       </main>
     </div>

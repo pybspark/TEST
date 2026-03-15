@@ -73,7 +73,7 @@ export default function LoginPage() {
             <Cloud className="w-7 h-7 text-white" />
           </div>
           <h1 className="text-2xl font-bold text-gray-900">BIN CLOUD</h1>
-          <p className="text-gray-500 text-sm mt-1">클라우드 저장소소</p>
+          <p className="text-gray-500 text-sm mt-1">클라우드 저장소</p>
         </div>
 
         <div className="flex bg-gray-100 rounded-xl p-1 mb-6">

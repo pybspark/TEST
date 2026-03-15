@@ -17,6 +17,7 @@ interface FileRecord {
   created_at: string
   is_shared: boolean
   group_id: string | null
+  profiles?: { name: string | null }
 }
 
 export default function VideosPage() {
@@ -32,7 +33,7 @@ export default function VideosPage() {
     if (!user) return
     const { data } = await supabase
       .from('files')
-      .select('*')
+      .select('*, profiles(name)')
       .eq('owner_id', user.id)
       .eq('file_type', 'video')
       .order('created_at', { ascending: false })
@@ -145,9 +146,18 @@ export default function VideosPage() {
               autoPlay
               className="w-full max-h-[70vh]"
             />
-            <div className="bg-gray-900 p-4 flex items-center justify-between">
-              <p className="text-sm font-medium text-white truncate flex-1">{playingVideo.name}</p>
-              <div className="flex gap-2 ml-4">
+            <div className="bg-gray-900 p-4 flex flex-col gap-2">
+              <p className="text-xs text-gray-400 flex items-center gap-1.5">
+                <Share2 className={`w-3 h-3 flex-shrink-0 ${playingVideo.is_shared ? 'text-brand-400' : 'text-gray-500'}`} />
+                {playingVideo.is_shared && playingVideo.group_id ? (
+                  <span className="text-brand-300">{groups.find((g) => g.id === playingVideo.group_id)?.name || '그룹'}에 공유됨</span>
+                ) : (
+                  <span className="text-gray-500">공유 안 함</span>
+                )}
+              </p>
+              <div className="flex items-center justify-between">
+                <p className="text-sm font-medium text-white truncate flex-1">{playingVideo.name}</p>
+                <div className="flex gap-2 ml-4">
                 <ShareGroupDropdown
                   isShared={playingVideo.is_shared}
                   sharedGroupId={playingVideo.group_id}
@@ -171,6 +181,7 @@ export default function VideosPage() {
                 >
                   <X className="w-4 h-4" />
                 </button>
+                </div>
               </div>
             </div>
           </div>

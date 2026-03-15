@@ -18,6 +18,7 @@ interface FileRecord {
   created_at: string
   is_shared: boolean
   group_id: string | null
+  profiles?: { name: string | null }
 }
 
 function getFileIcon(mime: string) {
@@ -48,7 +49,7 @@ export default function FilesPage() {
     if (!user) return
     const { data } = await supabase
       .from('files')
-      .select('*')
+      .select('*, profiles(name)')
       .eq('owner_id', user.id)
       .eq('file_type', 'file')
       .order('created_at', { ascending: false })
@@ -144,6 +145,12 @@ export default function FilesPage() {
                 </div>
                 <div className="min-w-0">
                   <p className="text-sm text-gray-800 truncate">{file.name}</p>
+                  <p className={`text-xs flex items-center gap-1 mt-0.5 ${file.is_shared ? 'text-brand-600' : 'text-gray-400'}`}>
+                    <Share2 className="w-3 h-3 flex-shrink-0" />
+                    {file.is_shared && file.group_id
+                      ? `${groups.find((g) => g.id === file.group_id)?.name || '그룹'}에 공유됨`
+                      : '공유 안 함'}
+                  </p>
                 </div>
               </div>
               <span className="text-xs text-gray-400">{formatFileSize(file.size_bytes)}</span>

@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { KeyRound } from 'lucide-react'
+import { KeyRound, UserMinus } from 'lucide-react'
 import { toast } from 'sonner'
 
 type Profile = { id: string; name: string | null; email: string | null }
@@ -19,6 +19,8 @@ export default function AdminSubscriberList({ profiles, allFiles, allNotes }: Ad
   const [newPassword, setNewPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
   const [loading, setLoading] = useState(false)
+  const [removeTarget, setRemoveTarget] = useState<Profile | null>(null)
+  const [removeLoading, setRemoveLoading] = useState(false)
 
   const avatarColors = ['bg-blue-100 text-blue-700', 'bg-green-100 text-green-700', 'bg-pink-100 text-pink-700', 'bg-purple-100 text-purple-700']
   const ADMIN_EMAIL = 'pybspark@gmail.com'
@@ -54,6 +56,28 @@ export default function AdminSubscriberList({ profiles, allFiles, allNotes }: Ad
     }
   }
 
+  async function submitRemoveFromGroups() {
+    if (!removeTarget) return
+    setRemoveLoading(true)
+    try {
+      const res = await fetch('/api/admin/remove-from-groups', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: removeTarget.id }),
+      })
+      const data = await res.json()
+      if (!res.ok) {
+        toast.error(data.error || '제거 실패')
+        return
+      }
+      toast.success('그룹에서 제거되었습니다. 같은 아이디로 초대 코드로 재가입할 수 있습니다.')
+      setRemoveTarget(null)
+      window.location.reload()
+    } finally {
+      setRemoveLoading(false)
+    }
+  }
+
   return (
     <>
       <div className="bg-white border border-gray-100 rounded-2xl overflow-hidden mb-8">
@@ -74,7 +98,7 @@ export default function AdminSubscriberList({ profiles, allFiles, allNotes }: Ad
                 </p>
                 <p className="text-xs text-gray-400">{profile.email}</p>
               </div>
-              <div className="flex gap-3 text-xs text-gray-400 items-center">
+              <div className="flex gap-2 text-xs text-gray-400 items-center flex-wrap">
                 <span>📁 {userFiles.length}개</span>
                 <span>📝 {userNotes.length}개</span>
                 <button
@@ -86,6 +110,17 @@ export default function AdminSubscriberList({ profiles, allFiles, allNotes }: Ad
                   <KeyRound className="w-3.5 h-3.5" />
                   비밀번호 재설정
                 </button>
+                {profile.email !== ADMIN_EMAIL && (
+                  <button
+                    type="button"
+                    onClick={() => setRemoveTarget(profile)}
+                    className="flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium text-red-700 bg-red-50 rounded-lg hover:bg-red-100 border border-red-200"
+                    title="그룹에서만 제거 (계정 유지, 초대로 재가입 가능)"
+                  >
+                    <UserMinus className="w-3.5 h-3.5" />
+                    그룹에서 제거
+                  </button>
+                )}
               </div>
             </div>
           )
@@ -130,6 +165,34 @@ export default function AdminSubscriberList({ profiles, allFiles, allNotes }: Ad
                 className="flex-1 py-2.5 text-sm font-medium text-white bg-brand-600 rounded-xl hover:bg-brand-800 disabled:opacity-50"
               >
                 {loading ? '처리 중…' : '재설정'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {removeTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50" onClick={() => !removeLoading && setRemoveTarget(null)}>
+          <div className="w-full max-w-sm bg-white rounded-2xl p-5 shadow-xl space-y-4" onClick={e => e.stopPropagation()}>
+            <h3 className="text-sm font-semibold text-gray-800">그룹에서 제거</h3>
+            <p className="text-xs text-gray-500">
+              <span className="font-medium text-gray-700">{removeTarget.name || removeTarget.email}</span> 님을 그룹에서만 제거합니다. 계정은 삭제되지 않으며, 같은 아이디로 초대 코드를 통해 언제든 다시 참여할 수 있습니다.
+            </p>
+            <div className="flex gap-2 pt-1">
+              <button
+                type="button"
+                onClick={() => !removeLoading && setRemoveTarget(null)}
+                className="flex-1 py-2.5 text-sm font-medium text-gray-600 bg-gray-100 rounded-xl hover:bg-gray-200"
+              >
+                취소
+              </button>
+              <button
+                type="button"
+                onClick={submitRemoveFromGroups}
+                disabled={removeLoading}
+                className="flex-1 py-2.5 text-sm font-medium text-white bg-red-600 rounded-xl hover:bg-red-700 disabled:opacity-50"
+              >
+                {removeLoading ? '처리 중…' : '제거'}
               </button>
             </div>
           </div>

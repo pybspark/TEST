@@ -98,6 +98,20 @@ export default function Sidebar({ user, usedBytes = 0, totalBytes = 10 * 1024 * 
           })}
         </nav>
         <div className="p-4 border-t border-gray-100 space-y-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <div className="w-8 h-8 rounded-full bg-yellow-200 flex items-center justify-center shadow-sm">
+                <span className="text-lg animate-cat-walk">🐈‍⬛</span>
+              </div>
+              <div className="text-[10px] text-gray-500 leading-tight">
+                <p>오늘도 조용히</p>
+                <p>파일 지켜보는 중...</p>
+              </div>
+            </div>
+            <span className="text-[10px] text-yellow-600 h-4 flex items-center animate-cat-zz">
+              Zz
+            </span>
+          </div>
           <div>
             <div className="flex justify-between text-xs text-gray-500 mb-1.5">
               <span>저장공간</span>

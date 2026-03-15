@@ -39,6 +39,23 @@ module.exports = {
         '4xl': ['2.7rem', { lineHeight: '2.75rem' }],
         '5xl': ['3.6rem', { lineHeight: '1' }],
       },
+      keyframes: {
+        'cat-walk': {
+          '0%, 100%': { transform: 'translateX(0px)' },
+          '25%': { transform: 'translateX(4px)' },
+          '50%': { transform: 'translateX(-3px)' },
+          '75%': { transform: 'translateX(2px)' },
+        },
+        'cat-zz': {
+          '0%, 40%': { opacity: 0, transform: 'translateY(2px)' },
+          '50%, 80%': { opacity: 1, transform: 'translateY(0)' },
+          '100%': { opacity: 0, transform: 'translateY(2px)' },
+        },
+      },
+      animation: {
+        'cat-walk': 'cat-walk 4s ease-in-out infinite',
+        'cat-zz': 'cat-zz 4s ease-in-out infinite',
+      },
     },
   },
   plugins: [],

@@ -212,14 +212,19 @@ export default function SharedPage() {
               ) : label === '메모' ? (
                 <ul className="space-y-1">
                   {(items as SharedNote[]).slice(0, 10).map((n) => (
-                    <li key={n.id} className="py-2 px-3 rounded-lg hover:bg-gray-50">
-                      <div className="flex items-center justify-between gap-2">
-                        <span className="text-gray-800 truncate text-sm">{n.title || '제목 없음'}</span>
-                        <span className="text-xs text-gray-400 flex-shrink-0">
-                          {formatDistanceToNow(new Date(n.created_at), { addSuffix: true, locale: ko })}
-                        </span>
-                      </div>
-                      <SharedByLabel item={n} />
+                    <li key={n.id}>
+                      <Link
+                        href={`/dashboard/notes?noteId=${n.id}`}
+                        className="block py-2 px-3 rounded-lg hover:bg-gray-50"
+                      >
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="text-gray-800 truncate text-sm">{n.title || '제목 없음'}</span>
+                          <span className="text-xs text-gray-400 flex-shrink-0">
+                            {formatDistanceToNow(new Date(n.created_at), { addSuffix: true, locale: ko })}
+                          </span>
+                        </div>
+                        <SharedByLabel item={n} />
+                      </Link>
                     </li>
                   ))}
                 </ul>

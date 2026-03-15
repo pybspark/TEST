@@ -1,5 +1,6 @@
 'use client'
 import { useState, useEffect } from 'react'
+import { useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
 import { Plus, Trash2, Share2, Pin, X, Save } from 'lucide-react'
 import { useMyGroups } from '@/hooks/useMyGroups'
@@ -28,6 +29,7 @@ const COLORS: Record<string, { bg: string; border: string; label: string }> = {
 }
 
 export default function NotesPage() {
+  const searchParams = useSearchParams()
   const [notes, setNotes] = useState<Note[]>([])
   const [loading, setLoading] = useState(true)
   const [editing, setEditing] = useState<Note | null>(null)
@@ -50,6 +52,17 @@ export default function NotesPage() {
   }
 
   useEffect(() => { fetchNotes() }, [])
+
+  useEffect(() => {
+    if (loading) return
+    const noteId = searchParams.get('noteId')
+    if (!noteId) return
+    const target = notes.find((n) => n.id === noteId)
+    if (target) {
+      setEditing(target)
+      setIsNew(false)
+    }
+  }, [loading, notes, searchParams])
 
   async function createNote() {
     const { data: { user } } = await supabase.auth.getUser()

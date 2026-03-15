@@ -79,12 +79,38 @@ export default function FilesPage() {
         .eq('file_type', 'file')
         .or('is_secure.eq.false,is_secure.is.null')
         .order('created_at', { ascending: false })
-      setFiles((dataWithoutFolder || []).map((f) => ({ ...f, file_folder_id: null })))
+      setFiles(
+        (dataWithoutFolder || []).map((f: Record<string, unknown>): FileRecord => ({
+          id: f.id as string,
+          name: f.name as string,
+          storage_path: f.storage_path as string,
+          size_bytes: f.size_bytes as number,
+          mime_type: f.mime_type as string,
+          created_at: f.created_at as string,
+          is_shared: f.is_shared as boolean,
+          group_id: f.group_id as string | null,
+          file_folder_id: null,
+          profiles: Array.isArray(f.profiles) ? (f.profiles[0] as { name: string | null }) : (f.profiles as { name: string | null } | undefined),
+        })
+      ))
       if (error.message?.includes('file_folder_id')) toast.info('파일 폴더 기능을 쓰려면 Supabase에서 add_file_folders.sql을 실행해주세요.')
     } else if (error) {
       setFiles([])
     } else {
-      setFiles(data || [])
+      setFiles(
+        (data || []).map((f: Record<string, unknown>): FileRecord => ({
+          id: f.id as string,
+          name: f.name as string,
+          storage_path: f.storage_path as string,
+          size_bytes: f.size_bytes as number,
+          mime_type: f.mime_type as string,
+          created_at: f.created_at as string,
+          is_shared: f.is_shared as boolean,
+          group_id: f.group_id as string | null,
+          file_folder_id: (f.file_folder_id as string | null) ?? null,
+          profiles: Array.isArray(f.profiles) ? (f.profiles[0] as { name: string | null }) ?? { name: null } : (f.profiles as { name: string | null } | undefined) ?? { name: null },
+        }))
+      )
     }
     setLoading(false)
   }, [supabase])

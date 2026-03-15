@@ -68,7 +68,8 @@ export default function DocumentThumbnail({ url: urlProp, bucket, storagePath, m
         const renderTask = page.render({
           canvasContext: canvas.getContext('2d')!,
           viewport,
-        })
+          canvas,
+        } as Parameters<typeof page.render>[0])
         await (renderTask.promise ?? Promise.resolve())
 
         if (!cancelled) setStatus('done')

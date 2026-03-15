@@ -66,7 +66,19 @@ export default function PhotosPage() {
         .eq('file_type', 'photo')
         .or('is_secure.eq.false,is_secure.is.null')
         .order('created_at', { ascending: false })
-      setPhotos((dataWithoutFolder || []).map((f) => ({ ...f, photo_folder_id: null })))
+      setPhotos(
+        (dataWithoutFolder || []).map((f: Record<string, unknown>): FileRecord => ({
+          id: f.id as string,
+          name: f.name as string,
+          storage_path: f.storage_path as string,
+          size_bytes: f.size_bytes as number,
+          created_at: f.created_at as string,
+          is_shared: f.is_shared as boolean,
+          group_id: f.group_id as string | null,
+          photo_folder_id: null,
+          profiles: Array.isArray(f.profiles) ? (f.profiles[0] as { name: string | null }) ?? { name: null } : (f.profiles as { name: string | null } | undefined) ?? { name: null },
+        }))
+      )
       if (error.message?.includes('photo_folder_id') && !photoFolderToastShown.current) {
         photoFolderToastShown.current = true
         toast.info('폴더 기능을 쓰려면 Supabase에서 add_photo_folders.sql을 실행해주세요.')
@@ -74,7 +86,19 @@ export default function PhotosPage() {
     } else if (error) {
       setPhotos([])
     } else {
-      setPhotos(data || [])
+      setPhotos(
+        (data || []).map((f: Record<string, unknown>): FileRecord => ({
+          id: f.id as string,
+          name: f.name as string,
+          storage_path: f.storage_path as string,
+          size_bytes: f.size_bytes as number,
+          created_at: f.created_at as string,
+          is_shared: f.is_shared as boolean,
+          group_id: f.group_id as string | null,
+          photo_folder_id: (f.photo_folder_id as string | null) ?? null,
+          profiles: Array.isArray(f.profiles) ? (f.profiles[0] as { name: string | null }) ?? { name: null } : (f.profiles as { name: string | null } | undefined) ?? { name: null },
+        }))
+      )
     }
     setLoading(false)
   }, [supabase])

@@ -332,16 +332,16 @@ export default function FilesPage() {
       ) : (
         <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
           {/* 헤더 */}
-          <div className="grid grid-cols-[1fr_80px_100px_140px] gap-4 px-4 py-2.5 border-b border-gray-100 text-xs font-medium text-gray-400">
+          <div className="grid grid-cols-[1fr_70px_88px_140px] gap-4 px-4 py-2.5 border-b border-gray-100 text-xs font-medium text-gray-400">
             <span>파일명</span>
-            <span>크기</span>
-            <span>날짜</span>
+            <span className="text-left">크기</span>
+            <span className="text-left">날짜</span>
             <span className="text-right">폴더 / 액션</span>
           </div>
           {displayFiles.map((file) => (
             <div
               key={file.id}
-              className="grid grid-cols-[1fr_80px_100px_140px] gap-4 items-center px-4 py-3 border-b border-gray-50 last:border-0 hover:bg-gray-50 transition-colors file-row"
+              className="grid grid-cols-[1fr_70px_88px_140px] gap-4 items-center px-4 py-3 border-b border-gray-50 last:border-0 hover:bg-gray-50 transition-colors file-row"
             >
               <div className="flex items-center gap-3 min-w-0">
                 <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 text-base ${getIconBg(file.mime_type)}`}>
@@ -365,8 +365,8 @@ export default function FilesPage() {
                   </p>
                 </div>
               </div>
-              <span className="text-xs text-gray-400">{formatFileSize(file.size_bytes)}</span>
-              <span className="text-xs text-gray-400">
+              <span className="text-xs text-gray-400 text-left">{formatFileSize(file.size_bytes)}</span>
+              <span className="text-xs text-gray-400 text-left">
                 {formatDistanceToNow(new Date(file.created_at), { addSuffix: true, locale: ko })}
               </span>
               <div className="flex items-center justify-end gap-1">

@@ -3,6 +3,8 @@ import { useState, useEffect } from 'react'
 import { createClient, getFileUrl, formatFileSize } from '@/lib/supabase'
 import UploadZone from '@/components/features/UploadZone'
 import { Upload, Video, Play, X, Trash2, Share2 } from 'lucide-react'
+import { useMyGroups } from '@/hooks/useMyGroups'
+import ShareGroupDropdown from '@/components/ui/ShareGroupDropdown'
 import { formatDistanceToNow } from 'date-fns'
 import { ko } from 'date-fns/locale'
 import { toast } from 'sonner'
@@ -14,6 +16,7 @@ interface FileRecord {
   size_bytes: number
   created_at: string
   is_shared: boolean
+  group_id: string | null
 }
 
 export default function VideosPage() {
@@ -22,6 +25,7 @@ export default function VideosPage() {
   const [showUpload, setShowUpload] = useState(false)
   const [playing, setPlaying] = useState<string | null>(null)
   const supabase = createClient()
+  const { groups } = useMyGroups()
 
   async function fetchVideos() {
     const { data: { user } } = await supabase.auth.getUser()
@@ -46,9 +50,9 @@ export default function VideosPage() {
     fetchVideos()
   }
 
-  async function toggleShare(id: string, current: boolean) {
-    await supabase.from('files').update({ is_shared: !current }).eq('id', id)
-    toast.success(current ? '공유 해제됨' : '가족과 공유됨')
+  async function setShareGroup(id: string, groupId: string | null) {
+    await supabase.from('files').update({ is_shared: !!groupId, group_id: groupId }).eq('id', id)
+    toast.success(groupId ? '해당 그룹에 공유됨' : '공유 해제됨')
     fetchVideos()
   }
 
@@ -144,15 +148,16 @@ export default function VideosPage() {
             <div className="bg-gray-900 p-4 flex items-center justify-between">
               <p className="text-sm font-medium text-white truncate flex-1">{playingVideo.name}</p>
               <div className="flex gap-2 ml-4">
-                <button
-                  onClick={() => toggleShare(playingVideo.id, playingVideo.is_shared)}
+                <ShareGroupDropdown
+                  isShared={playingVideo.is_shared}
+                  sharedGroupId={playingVideo.group_id}
+                  groupName={playingVideo.group_id ? groups.find((g) => g.id === playingVideo.group_id)?.name : null}
+                  groups={groups}
+                  onSelect={(groupId) => setShareGroup(playingVideo.id, groupId)}
                   className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
                     playingVideo.is_shared ? 'bg-brand-600 text-white' : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
                   }`}
-                >
-                  <Share2 className="w-3 h-3" />
-                  {playingVideo.is_shared ? '공유 중' : '가족 공유'}
-                </button>
+                />
                 <button
                   onClick={() => deleteVideo(playingVideo.id, playingVideo.storage_path)}
                   className="flex items-center gap-1.5 px-3 py-1.5 bg-red-900/50 text-red-400 rounded-lg text-xs font-medium hover:bg-red-900 transition-colors"

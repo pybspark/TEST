@@ -3,6 +3,8 @@ import { useState, useEffect } from 'react'
 import { createClient, getFileUrl } from '@/lib/supabase'
 import UploadZone from '@/components/features/UploadZone'
 import { Upload, X, Download, Trash2, Share2, ZoomIn } from 'lucide-react'
+import { useMyGroups } from '@/hooks/useMyGroups'
+import ShareGroupDropdown from '@/components/ui/ShareGroupDropdown'
 import Image from 'next/image'
 import { toast } from 'sonner'
 
@@ -13,6 +15,7 @@ interface FileRecord {
   size_bytes: number
   created_at: string
   is_shared: boolean
+  group_id: string | null
 }
 
 export default function PhotosPage() {
@@ -21,6 +24,7 @@ export default function PhotosPage() {
   const [showUpload, setShowUpload] = useState(false)
   const [selected, setSelected] = useState<string | null>(null)
   const supabase = createClient()
+  const { groups } = useMyGroups()
 
   async function fetchPhotos() {
     const { data: { user } } = await supabase.auth.getUser()
@@ -45,9 +49,9 @@ export default function PhotosPage() {
     fetchPhotos()
   }
 
-  async function toggleShare(id: string, current: boolean) {
-    await supabase.from('files').update({ is_shared: !current }).eq('id', id)
-    toast.success(current ? '공유 해제됨' : '가족과 공유됨')
+  async function setShareGroup(id: string, groupId: string | null) {
+    await supabase.from('files').update({ is_shared: !!groupId, group_id: groupId }).eq('id', id)
+    toast.success(groupId ? '해당 그룹에 공유됨' : '공유 해제됨')
     fetchPhotos()
   }
 
@@ -142,17 +146,18 @@ export default function PhotosPage() {
             <div className="p-4 border-t border-gray-100">
               <p className="font-medium text-gray-900 text-sm truncate mb-3">{selectedPhoto.name}</p>
               <div className="flex gap-2">
-                <button
-                  onClick={() => toggleShare(selectedPhoto.id, selectedPhoto.is_shared)}
-                  className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-xl text-sm font-medium transition-colors ${
-                    selectedPhoto.is_shared
-                      ? 'bg-brand-50 text-brand-600'
-                      : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                  }`}
-                >
-                  <Share2 className="w-3.5 h-3.5" />
-                  {selectedPhoto.is_shared ? '공유 중' : '가족 공유'}
-                </button>
+                <div className="flex-1 flex items-center justify-center">
+                  <ShareGroupDropdown
+                    isShared={selectedPhoto.is_shared}
+                    sharedGroupId={selectedPhoto.group_id}
+                    groupName={selectedPhoto.group_id ? groups.find((g) => g.id === selectedPhoto.group_id)?.name : null}
+                    groups={groups}
+                    onSelect={(groupId) => setShareGroup(selectedPhoto.id, groupId)}
+                    className={`flex items-center justify-center gap-2 py-2 px-4 rounded-xl text-sm font-medium transition-colors ${
+                      selectedPhoto.is_shared ? 'bg-brand-50 text-brand-600' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                    }`}
+                  />
+                </div>
                 <a
                   href={getFileUrl('family-files', selectedPhoto.storage_path)}
                   download={selectedPhoto.name}

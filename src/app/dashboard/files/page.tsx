@@ -3,6 +3,8 @@ import { useState, useEffect } from 'react'
 import { createClient, getFileUrl, formatFileSize } from '@/lib/supabase'
 import UploadZone from '@/components/features/UploadZone'
 import { Upload, FileText, Trash2, Download, Share2, Search } from 'lucide-react'
+import { useMyGroups } from '@/hooks/useMyGroups'
+import ShareGroupDropdown from '@/components/ui/ShareGroupDropdown'
 import { formatDistanceToNow } from 'date-fns'
 import { ko } from 'date-fns/locale'
 import { toast } from 'sonner'
@@ -15,6 +17,7 @@ interface FileRecord {
   mime_type: string
   created_at: string
   is_shared: boolean
+  group_id: string | null
 }
 
 function getFileIcon(mime: string) {
@@ -38,6 +41,7 @@ export default function FilesPage() {
   const [showUpload, setShowUpload] = useState(false)
   const [query, setQuery] = useState('')
   const supabase = createClient()
+  const { groups } = useMyGroups()
 
   async function fetchFiles() {
     const { data: { user } } = await supabase.auth.getUser()
@@ -61,9 +65,9 @@ export default function FilesPage() {
     fetchFiles()
   }
 
-  async function toggleShare(id: string, current: boolean) {
-    await supabase.from('files').update({ is_shared: !current }).eq('id', id)
-    toast.success(current ? '공유 해제됨' : '가족과 공유됨')
+  async function setShareGroup(id: string, groupId: string | null) {
+    await supabase.from('files').update({ is_shared: !!groupId, group_id: groupId }).eq('id', id)
+    toast.success(groupId ? '해당 그룹에 공유됨' : '공유 해제됨')
     fetchFiles()
   }
 
@@ -147,13 +151,14 @@ export default function FilesPage() {
                 {formatDistanceToNow(new Date(file.created_at), { addSuffix: true, locale: ko })}
               </span>
               <div className="flex items-center justify-end gap-1">
-                <button
-                  onClick={() => toggleShare(file.id, file.is_shared)}
-                  title={file.is_shared ? '공유 해제' : '가족 공유'}
+                <ShareGroupDropdown
+                  isShared={file.is_shared}
+                  sharedGroupId={file.group_id}
+                  groupName={file.group_id ? groups.find((g) => g.id === file.group_id)?.name : null}
+                  groups={groups}
+                  onSelect={(groupId) => setShareGroup(file.id, groupId)}
                   className={`p-1.5 rounded-lg transition-colors ${file.is_shared ? 'text-brand-600 bg-brand-50' : 'text-gray-400 hover:text-brand-600 hover:bg-brand-50'}`}
-                >
-                  <Share2 className="w-3.5 h-3.5" />
-                </button>
+                />
                 <a
                   href={getFileUrl('family-files', file.storage_path)}
                   download={file.name}

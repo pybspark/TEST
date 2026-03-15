@@ -2,6 +2,8 @@
 import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase'
 import { Plus, Trash2, Share2, Pin, X, Save } from 'lucide-react'
+import { useMyGroups } from '@/hooks/useMyGroups'
+import ShareGroupDropdown from '@/components/ui/ShareGroupDropdown'
 import { formatDistanceToNow } from 'date-fns'
 import { ko } from 'date-fns/locale'
 import { toast } from 'sonner'
@@ -13,6 +15,7 @@ interface Note {
   color: string
   pinned: boolean
   is_shared: boolean
+  group_id: string | null
   updated_at: string
 }
 
@@ -29,6 +32,7 @@ export default function NotesPage() {
   const [editing, setEditing] = useState<Note | null>(null)
   const [isNew, setIsNew] = useState(false)
   const supabase = createClient()
+  const { groups } = useMyGroups()
 
   async function fetchNotes() {
     const { data: { user } } = await supabase.auth.getUser()
@@ -55,6 +59,7 @@ export default function NotesPage() {
       color: 'yellow',
       pinned: false,
       is_shared: false,
+      group_id: null,
       updated_at: new Date().toISOString(),
     }
     setEditing(newNote)
@@ -73,6 +78,7 @@ export default function NotesPage() {
         color: editing.color,
         pinned: editing.pinned,
         is_shared: editing.is_shared,
+        group_id: editing.group_id,
       }).select().single()
       if (data) toast.success('메모가 저장되었습니다')
     } else {
@@ -82,6 +88,7 @@ export default function NotesPage() {
         color: editing.color,
         pinned: editing.pinned,
         is_shared: editing.is_shared,
+        group_id: editing.group_id,
         updated_at: new Date().toISOString(),
       }).eq('id', editing.id)
       toast.success('저장되었습니다')
@@ -102,9 +109,9 @@ export default function NotesPage() {
     fetchNotes()
   }
 
-  async function toggleShare(id: string, current: boolean) {
-    await supabase.from('notes').update({ is_shared: !current }).eq('id', id)
-    toast.success(current ? '공유 해제됨' : '가족과 공유됨')
+  async function setShareGroup(id: string, groupId: string | null) {
+    await supabase.from('notes').update({ is_shared: !!groupId, group_id: groupId }).eq('id', id)
+    toast.success(groupId ? '해당 그룹에 공유됨' : '공유 해제됨')
     fetchNotes()
   }
 
@@ -190,12 +197,14 @@ export default function NotesPage() {
               >
                 <Pin className="w-4 h-4" />
               </button>
-              <button
-                onClick={() => setEditing({ ...editing, is_shared: !editing.is_shared })}
+              <ShareGroupDropdown
+                isShared={editing.is_shared}
+                sharedGroupId={editing.group_id}
+                groupName={editing.group_id ? groups.find((g) => g.id === editing.group_id)?.name : null}
+                groups={groups}
+                onSelect={(groupId) => setEditing({ ...editing, group_id: groupId, is_shared: !!groupId })}
                 className={`p-1.5 rounded-lg transition-colors ${editing.is_shared ? 'text-brand-600 bg-brand-100' : 'text-gray-400 hover:text-brand-600'}`}
-              >
-                <Share2 className="w-4 h-4" />
-              </button>
+              />
             </div>
 
             <div className="p-4 space-y-2">

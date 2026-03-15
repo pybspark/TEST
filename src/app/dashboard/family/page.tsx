@@ -66,16 +66,18 @@ export default function FamilyPage() {
         .eq('group_id', memberRow.group_id)
       setMembers((mems as Member[]) || [])
 
-      // 공유된 파일
+      // 이 그룹에 공유된 파일·메모만 (group_id가 이 그룹이거나, 예전 데이터 호환용 group_id 없음)
       const { data: sFiles } = await supabase
         .from('files')
         .select('id, name, file_type, created_at')
         .eq('is_shared', true)
+        .or(`group_id.eq.${memberRow.group_id},group_id.is.null`)
         .limit(10)
       const { data: sNotes } = await supabase
         .from('notes')
         .select('id, title, created_at')
         .eq('is_shared', true)
+        .or(`group_id.eq.${memberRow.group_id},group_id.is.null`)
         .limit(10)
       setSharedItems([
         ...(sFiles || []).map((f) => ({ ...f, type: 'file' as const })),

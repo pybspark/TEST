@@ -161,7 +161,7 @@ export default function VideosPage() {
           onClick={() => setPlaying(null)}
         >
           <div
-            className="bg-black rounded-2xl overflow-hidden max-w-3xl w-full"
+            className="bg-black rounded-2xl overflow-hidden max-w-3xl w-full max-h-[90vh] flex flex-col"
             onClick={(e) => e.stopPropagation()}
           >
             <video
@@ -170,7 +170,7 @@ export default function VideosPage() {
               autoPlay
               className="w-full max-h-[70vh]"
             />
-            <div className="bg-gray-900 p-4 flex flex-col gap-2">
+            <div className="bg-gray-900 p-4 flex flex-col gap-2 overflow-y-auto">
               <p className="text-xs text-gray-400 flex items-center gap-1.5">
                 <Share2 className={`w-3 h-3 flex-shrink-0 ${playingVideo.is_shared ? 'text-brand-400' : 'text-gray-500'}`} />
                 {playingVideo.is_shared && playingVideo.group_id ? (

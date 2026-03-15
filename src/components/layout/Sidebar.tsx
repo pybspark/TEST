@@ -134,16 +134,21 @@ export default function Sidebar({ user, usedBytes = 0, totalBytes = 10 * 1024 * 
       </aside>
 
       {/* ===== 모바일 상단바 ===== */}
-      <div className="md:hidden fixed top-0 left-0 right-0 z-40 bg-white border-b border-gray-100 px-4 h-14 flex items-center justify-between">
+      <div className="md:hidden fixed top-0 left-0 right-0 z-40 bg-white border-b border-gray-100 px-3 h-14 flex items-center justify-between">
         <div className="flex items-center gap-2">
           <div className="w-6 h-6 bg-brand-600 rounded-lg flex items-center justify-center">
             <Cloud className="w-3.5 h-3.5 text-white" />
           </div>
           <span className="font-semibold text-gray-900 text-sm">BIN CLOUD</span>
         </div>
-        <button onClick={() => setMenuOpen(!menuOpen)} className="p-2 rounded-lg text-gray-500 hover:bg-gray-100">
-          {menuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
-        </button>
+        <div className="flex items-center gap-2">
+          <div className="w-7 h-7 rounded-full bg-yellow-200 flex items-center justify-center shadow-sm">
+            <span className="text-base animate-cat-walk">🐈‍⬛</span>
+          </div>
+          <button onClick={() => setMenuOpen(!menuOpen)} className="p-2 rounded-lg text-gray-500 hover:bg-gray-100">
+            {menuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+          </button>
+        </div>
       </div>
 
       {/* 모바일 드로어 메뉴 */}

@@ -18,6 +18,10 @@ interface UploadZoneProps {
   fileType?: 'photo' | 'video' | 'file'
   isSecure?: boolean
   folderId?: string | null
+  /** 일반 사진 탭에서 업로드 시 이 폴더에 넣음 */
+  photoFolderId?: string | null
+  /** 일반 파일 탭에서 업로드 시 이 폴더에 넣음 */
+  fileFolderId?: string | null
 }
 
 export default function UploadZone({
@@ -27,6 +31,8 @@ export default function UploadZone({
   fileType = 'file',
   isSecure = false,
   folderId = null,
+  photoFolderId = null,
+  fileFolderId = null,
 }: UploadZoneProps) {
   const [items, setItems] = useState<UploadItem[]>([])
   const [uploading, setUploading] = useState(false)
@@ -90,6 +96,8 @@ export default function UploadZone({
         is_secure: isSecure,
       }
       if (isSecure && folderId) insertPayload.folder_id = folderId
+      if (!isSecure && fileType === 'photo' && photoFolderId) insertPayload.photo_folder_id = photoFolderId
+      if (!isSecure && fileType === 'file' && fileFolderId) insertPayload.file_folder_id = fileFolderId
 
       const { error: insertError } = await supabase.from('files').insert(insertPayload)
 

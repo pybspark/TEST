@@ -537,7 +537,7 @@ export default function SecureFolderPage() {
       .from('secure_folders')
       .select('id, name, created_at')
       .eq('owner_id', user.id)
-      .order('name')
+      .order('created_at', { ascending: true })
     setSecureFolders(data || [])
   }, [supabase])
 
@@ -604,12 +604,21 @@ export default function SecureFolderPage() {
   }
 
   async function deleteFolder(folderId: string) {
-    await supabase.from('files').update({ folder_id: null }).eq('folder_id', folderId)
-    await supabase.from('secure_folders').delete().eq('id', folderId)
+    const res = await fetch('/api/secure/delete-folder', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ folderId }),
+    })
+    const data = await res.json().catch(() => ({}))
+    if (!res.ok) {
+      toast.error(data?.error || '폴더를 삭제하지 못했어요')
+      return
+    }
     toast.success('폴더를 삭제했어요. 안의 파일은 폴더 없음으로 옮겨졌어요')
     if (selectedFileFolderId === folderId) setSelectedFileFolderId(null)
+    setSecureFiles((prev) => prev.map((f) => (f.folder_id === folderId ? { ...f, folder_id: null } : f)))
     fetchSecureFolders()
-    fetchSecureFiles()
+    // refetch 하지 않음: 위 setSecureFiles 로 이미 반영됨. fetchSecureFiles() 실패 시 fallback 이 전체를 folder_id null 로 덮어써서 깜빡임·전체 밖으로 나오는 현상 방지
   }
 
   async function renameSecureFile(fileId: string, newName: string) {
@@ -807,14 +816,14 @@ export default function SecureFolderPage() {
                 {!selectedFileFolderId && secureFolders.length > 0 && (
                   <div className="mb-6">
                     <h3 className="text-sm font-semibold text-gray-700 mb-2">폴더</h3>
-                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
+                    <div className="grid gap-3 min-w-0" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(20rem, 1fr))' }}>
                       {secureFolders.map((folder) => {
                         const count = secureByType.files.filter((f) => f.folder_id === folder.id).length
                         const isDropTarget = dragOverFolderId === folder.id
                         return (
                           <div
                             key={folder.id}
-                            className={`flex items-center gap-3 p-4 rounded-2xl border-2 transition-all group ${isDropTarget ? 'border-brand-400 bg-brand-50 shadow-md' : 'border-gray-100 bg-white hover:shadow-md'}`}
+                            className={`flex items-center gap-3 p-4 rounded-2xl border-2 transition-all group min-w-0 w-full overflow-hidden ${isDropTarget ? 'border-brand-400 bg-brand-50 shadow-md' : 'border-gray-100 bg-white hover:shadow-md'}`}
                             onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; setDragOverFolderId(folder.id) }}
                             onDragLeave={() => setDragOverFolderId(null)}
                             onDrop={(e) => {
@@ -849,8 +858,8 @@ export default function SecureFolderPage() {
                                   </div>
                                 ) : (
                                   <>
-                                    <p className="font-medium text-gray-800 truncate">{folder.name}</p>
-                                    <p className="text-xs text-gray-400">{count}개 파일</p>
+                                    <p className="font-medium text-gray-800 whitespace-nowrap truncate" title={folder.name}>{folder.name}</p>
+                                    <p className="text-xs text-gray-400 whitespace-nowrap">{count}개 파일</p>
                                   </>
                                 )}
                               </div>

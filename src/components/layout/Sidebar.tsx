@@ -1,16 +1,19 @@
 'use client'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { Cloud, Image, FileText, Video, StickyNote, Users, LogOut, HardDrive } from 'lucide-react'
+import { Cloud, Image, FileText, Video, StickyNote, Users, LogOut, HardDrive, Share2, Crown } from 'lucide-react'
 import { createClient } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
 
-const navItems = [
+const ADMIN_EMAIL = 'pybspark@gmail.com'
+
+const baseNavItems = [
   { href: '/dashboard', label: '전체 보기', icon: HardDrive, exact: true },
   { href: '/dashboard/photos', label: '사진', icon: Image },
   { href: '/dashboard/files', label: '파일', icon: FileText },
   { href: '/dashboard/videos', label: '영상', icon: Video },
   { href: '/dashboard/notes', label: '메모', icon: StickyNote },
+  { href: '/dashboard/shared', label: '공유됨', icon: Share2 },
   { href: '/dashboard/family', label: '멤버 관리', icon: Users },
 ]
 
@@ -26,6 +29,10 @@ export default function Sidebar({ user, usedBytes = 0, totalBytes = 10 * 1024 * 
   const supabase = createClient()
   const usedPct = Math.round((usedBytes / totalBytes) * 100)
 
+  const navItems = user.email === ADMIN_EMAIL
+    ? [...baseNavItems, { href: '/dashboard/admin', label: '관리자', icon: Crown, exact: false }]
+    : baseNavItems
+
   function formatGB(bytes: number) {
     return (bytes / 1024 / 1024 / 1024).toFixed(1)
   }
@@ -38,7 +45,6 @@ export default function Sidebar({ user, usedBytes = 0, totalBytes = 10 * 1024 * 
 
   return (
     <aside className="w-[220px] h-screen bg-white border-r border-gray-100 flex flex-col fixed left-0 top-0 z-30">
-      {/* 로고 */}
       <div className="p-4 pb-2">
         <div className="flex items-center gap-2.5 px-2 py-2">
           <div className="w-7 h-7 bg-brand-600 rounded-lg flex items-center justify-center flex-shrink-0">
@@ -48,7 +54,6 @@ export default function Sidebar({ user, usedBytes = 0, totalBytes = 10 * 1024 * 
         </div>
       </div>
 
-      {/* 네비게이션 */}
       <nav className="flex-1 px-3 py-2 space-y-0.5 overflow-y-auto">
         {navItems.map(({ href, label, icon: Icon, exact }) => {
           const active = exact ? pathname === href : pathname.startsWith(href)
@@ -69,7 +74,6 @@ export default function Sidebar({ user, usedBytes = 0, totalBytes = 10 * 1024 * 
         })}
       </nav>
 
-      {/* 저장공간 & 로그아웃 */}
       <div className="p-4 border-t border-gray-100 space-y-3">
         <div>
           <div className="flex justify-between text-xs text-gray-500 mb-1.5">

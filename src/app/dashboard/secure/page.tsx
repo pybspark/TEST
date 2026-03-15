@@ -61,7 +61,11 @@ export default function SecureFolderPage() {
   const [showUpload, setShowUpload] = useState(false)
   const [editingNote, setEditingNote] = useState<SecureNote | null>(null)
   const [isNewNote, setIsNewNote] = useState(false)
+  const [draggedFileId, setDraggedFileId] = useState<string | null>(null)
+  const [dragOverFolderId, setDragOverFolderId] = useState<string | null>(null)
   const supabase = createClient()
+
+  const DRAG_FILE_KEY = 'application/x-secure-file-id'
 
   useEffect(() => {
     fetch('/api/secure/status')
@@ -238,7 +242,7 @@ export default function SecureFolderPage() {
   async function deleteFolder(folderId: string) {
     await supabase.from('files').update({ folder_id: null }).eq('folder_id', folderId)
     await supabase.from('secure_folders').delete().eq('id', folderId)
-    toast.success('폴더를 삭제했어요. 안의 파일은 루트로 옮겨졌어요')
+    toast.success('폴더를 삭제했어요. 안의 파일은 폴더 없음으로 옮겨졌어요')
     if (selectedFileFolderId === folderId) setSelectedFileFolderId(null)
     fetchSecureFolders()
     fetchSecureFiles()
@@ -354,7 +358,20 @@ export default function SecureFolderPage() {
             <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
               {selectedFileFolderId ? (
                 <div className="flex items-center gap-2 text-sm flex-wrap">
-                  <button onClick={() => setSelectedFileFolderId(null)} className="text-gray-500 hover:text-gray-800">전체</button>
+                  <span
+                    onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; setDragOverFolderId('root') }}
+                    onDragLeave={() => setDragOverFolderId(null)}
+                    onDrop={(e) => {
+                      e.preventDefault()
+                      const fileId = e.dataTransfer.getData(DRAG_FILE_KEY)
+                      if (fileId) { moveFileToFolder(fileId, null); toast.success('폴더에서 빼냈어요') }
+                      setDragOverFolderId(null)
+                      setDraggedFileId(null)
+                    }}
+                    className={`inline-flex items-center rounded-lg px-2 py-1 -ml-1 transition-colors ${dragOverFolderId === 'root' ? 'bg-brand-100 text-brand-700' : ''}`}
+                  >
+                    <button type="button" onClick={() => setSelectedFileFolderId(null)} className="text-gray-500 hover:text-gray-800">전체</button>
+                  </span>
                   <ChevronRight className="w-4 h-4 text-gray-400" />
                   <span className="font-medium text-gray-800">{currentFolder?.name}</span>
                   <button onClick={() => currentFolder && deleteFolder(currentFolder.id)} className="text-red-500 hover:text-red-600 text-xs ml-2">폴더 삭제</button>
@@ -376,7 +393,7 @@ export default function SecureFolderPage() {
 
             {showNewFolder && (
               <div className="mb-4 p-4 bg-white border border-gray-100 rounded-2xl flex gap-2">
-                <input type="text" value={newFolderName} onChange={(e) => setNewFolderName(e.target.value)} placeholder="폴더 이름 (예: 계약서, cursor)" className="flex-1 px-4 py-2 border border-gray-200 rounded-xl text-sm" onKeyDown={(e) => e.key === 'Enter' && createFolder()} />
+                <input type="text" value={newFolderName} onChange={(e) => setNewFolderName(e.target.value)} placeholder="폴더 이름 (예: 계약서, 프로젝트, 업무)" className="flex-1 px-4 py-2 border border-gray-200 rounded-xl text-sm" onKeyDown={(e) => e.key === 'Enter' && createFolder()} />
                 <button onClick={createFolder} className="px-4 py-2 bg-brand-600 text-white rounded-xl text-sm font-medium">만들기</button>
                 <button onClick={() => { setShowNewFolder(false); setNewFolderName('') }} className="px-4 py-2 text-gray-500 hover:bg-gray-100 rounded-xl text-sm">취소</button>
               </div>
@@ -398,8 +415,21 @@ export default function SecureFolderPage() {
                     <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
                       {secureFolders.map((folder) => {
                         const count = secureByType.files.filter((f) => f.folder_id === folder.id).length
+                        const isDropTarget = dragOverFolderId === folder.id
                         return (
-                          <div key={folder.id} className="flex items-center gap-3 p-4 bg-white border border-gray-100 rounded-2xl hover:shadow-md transition-shadow group">
+                          <div
+                            key={folder.id}
+                            className={`flex items-center gap-3 p-4 rounded-2xl border-2 transition-all group ${isDropTarget ? 'border-brand-400 bg-brand-50 shadow-md' : 'border-gray-100 bg-white hover:shadow-md'}`}
+                            onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; setDragOverFolderId(folder.id) }}
+                            onDragLeave={() => setDragOverFolderId(null)}
+                            onDrop={(e) => {
+                              e.preventDefault()
+                              const fileId = e.dataTransfer.getData(DRAG_FILE_KEY)
+                              if (fileId) { moveFileToFolder(fileId, folder.id); toast.success('폴더로 옮겼어요') }
+                              setDragOverFolderId(null)
+                              setDraggedFileId(null)
+                            }}
+                          >
                             <button onClick={() => setSelectedFileFolderId(folder.id)} className="flex-1 flex items-center gap-3 text-left min-w-0">
                               <div className="w-12 h-12 rounded-xl bg-amber-50 flex items-center justify-center flex-shrink-0"><FolderOpen className="w-6 h-6 text-amber-600" /></div>
                               <div className="min-w-0">
@@ -419,7 +449,7 @@ export default function SecureFolderPage() {
                   <div className="flex items-center gap-2 mb-3 mt-1">
                     <span className="text-xs text-gray-400">폴더에 안 넣은 파일</span>
                     <span className="text-xs text-gray-300">·</span>
-                    <span className="text-xs text-gray-400">파일 카드에 마우스를 올리면 다른 폴더로 옮길 수 있어요</span>
+                    <span className="text-xs text-gray-400">드래그해서 폴더에 넣거나, 카드에 마우스를 올려 이동할 수 있어요</span>
                   </div>
                 )}
                 {(selectedFileFolderId ? filesInCurrentFolder : rootFiles).length === 0 ? (
@@ -431,13 +461,19 @@ export default function SecureFolderPage() {
                 ) : (
                   <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
                     {(selectedFileFolderId ? filesInCurrentFolder : rootFiles).map((f) => (
-                      <div key={f.id} className="bg-white rounded-2xl border border-gray-100 overflow-hidden hover:shadow-md transition-shadow flex flex-col group">
+                      <div
+                        key={f.id}
+                        draggable
+                        onDragStart={(e) => { e.dataTransfer.setData(DRAG_FILE_KEY, f.id); e.dataTransfer.effectAllowed = 'move'; setDraggedFileId(f.id) }}
+                        onDragEnd={() => { setDraggedFileId(null); setDragOverFolderId(null) }}
+                        className={`bg-white rounded-2xl border border-gray-100 overflow-hidden hover:shadow-md transition-all flex flex-col group cursor-grab active:cursor-grabbing ${draggedFileId === f.id ? 'opacity-50' : ''}`}
+                      >
                         <div className="aspect-square min-h-[140px] bg-gray-50 flex items-center justify-center relative">
                           <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-gray-100 to-gray-50"><span className="text-5xl">{getFileIcon(f.mime_type)}</span></div>
                           <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors flex items-center justify-end gap-1 p-2 opacity-0 group-hover:opacity-100">
                             <select className="text-xs rounded-lg border border-gray-200 bg-white px-2 py-1.5 text-gray-600" value="" onChange={(e) => { const v = e.target.value; moveFileToFolder(f.id, v || null); e.target.value = '' }} title="폴더로 이동">
                               <option value="">이동...</option>
-                              <option value="">📁 루트</option>
+                              <option value="">📁 폴더 없음</option>
                               {secureFolders.map((fd) => <option key={fd.id} value={fd.id}>📁 {fd.name}</option>)}
                             </select>
                             <a href={getFileUrl('family-files', f.storage_path)} download={f.name} className="p-2 rounded-lg bg-white/90 text-gray-700 hover:bg-white shadow"><Download className="w-4 h-4" /></a>

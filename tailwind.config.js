@@ -28,6 +28,17 @@ module.exports = {
       fontFamily: {
         sans: ['Pretendard', '-apple-system', 'BlinkMacSystemFont', 'system-ui', 'sans-serif'],
       },
+      fontSize: {
+        xs: ['0.9rem', { lineHeight: '1.25rem' }],
+        sm: ['1.05rem', { lineHeight: '1.5rem' }],
+        base: ['1.2rem', { lineHeight: '1.8rem' }],
+        lg: ['1.35rem', { lineHeight: '2rem' }],
+        xl: ['1.5rem', { lineHeight: '2rem' }],
+        '2xl': ['1.875rem', { lineHeight: '2.25rem' }],
+        '3xl': ['2.25rem', { lineHeight: '2.5rem' }],
+        '4xl': ['2.7rem', { lineHeight: '2.75rem' }],
+        '5xl': ['3.6rem', { lineHeight: '1' }],
+      },
     },
   },
   plugins: [],

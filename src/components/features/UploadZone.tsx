@@ -17,6 +17,7 @@ interface UploadZoneProps {
   bucket?: string
   fileType?: 'photo' | 'video' | 'file'
   isSecure?: boolean
+  folderId?: string | null
 }
 
 export default function UploadZone({
@@ -25,6 +26,7 @@ export default function UploadZone({
   bucket = 'family-files',
   fileType = 'file',
   isSecure = false,
+  folderId = null,
 }: UploadZoneProps) {
   const [items, setItems] = useState<UploadItem[]>([])
   const [uploading, setUploading] = useState(false)
@@ -57,6 +59,11 @@ export default function UploadZone({
       const ext = item.file.name.split('.').pop()
       const path = `${user.id}/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`
 
+      // 보안폴더 등 통합 업로드: 파일 타입 자동 판별 (video -> video, image -> photo, 나머지 -> file)
+      const detectedType = isSecure
+        ? (item.file.type.startsWith('video/') ? 'video' : item.file.type.startsWith('image/') ? 'photo' : 'file')
+        : fileType
+
       setItems((prev) =>
         prev.map((x) => x.file === item.file ? { ...x, status: 'uploading', progress: 30 } : x)
       )
@@ -73,15 +80,18 @@ export default function UploadZone({
       }
 
       // DB에 파일 정보 저장
-      const { error: insertError } = await supabase.from('files').insert({
+      const insertPayload: Record<string, unknown> = {
         owner_id: user.id,
         name: item.file.name,
         storage_path: path,
-        file_type: fileType,
+        file_type: detectedType,
         mime_type: item.file.type,
         size_bytes: item.file.size,
         is_secure: isSecure,
-      })
+      }
+      if (isSecure && folderId) insertPayload.folder_id = folderId
+
+      const { error: insertError } = await supabase.from('files').insert(insertPayload)
 
       if (insertError) {
         setItems((prev) =>

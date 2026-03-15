@@ -92,7 +92,7 @@ export default function FamilyPage() {
     if (!user) return
     const { data: grp } = await supabase
       .from('family_groups')
-      .insert({ name: '우리 가족', owner_id: user.id })
+      .insert({ name: '우리 그룹', owner_id: user.id })
       .select()
       .single()
     if (grp) {
@@ -101,7 +101,7 @@ export default function FamilyPage() {
         user_id: user.id,
         role: 'owner',
       })
-      toast.success('가족 그룹이 생성되었습니다!')
+      toast.success('그룹이 생성되었습니다!')
       fetchData()
     }
   }
@@ -145,16 +145,16 @@ export default function FamilyPage() {
         <div className="w-16 h-16 bg-brand-50 rounded-2xl flex items-center justify-center mb-4">
           <Users className="w-8 h-8 text-brand-600" />
         </div>
-        <h2 className="text-lg font-bold text-gray-900 mb-2">가족 그룹 없음</h2>
+        <h2 className="text-lg font-bold text-gray-900 mb-2">그룹 없음</h2>
         <p className="text-sm text-gray-500 text-center mb-6">
-          가족 그룹을 만들고 초대 코드로 가족을 초대하세요
+          그룹을 만들고 초대 코드로 멤버를 초대하세요
         </p>
         <button
           onClick={createGroup}
           className="flex items-center gap-2 px-6 py-3 bg-brand-600 text-white rounded-xl text-sm font-medium hover:bg-brand-800 transition-colors"
         >
           <UserPlus className="w-4 h-4" />
-          가족 그룹 만들기
+          멤버 그룹 만들기
         </button>
       </div>
     )
@@ -163,8 +163,8 @@ export default function FamilyPage() {
   return (
     <div className="p-6 max-w-2xl mx-auto space-y-5">
       <div>
-        <h1 className="text-xl font-bold text-gray-900">가족 관리</h1>
-        <p className="text-sm text-gray-500 mt-0.5">가족을 초대하고 함께 공유하세요</p>
+        <h1 className="text-xl font-bold text-gray-900">그룹 관리</h1>
+        <p className="text-sm text-gray-500 mt-0.5">그룹을 초대하고 함께 공유하세요</p>
       </div>
 
       {/* 그룹 이름 */}
@@ -190,7 +190,7 @@ export default function FamilyPage() {
       <div className="bg-white border border-gray-100 rounded-2xl p-5">
         <h2 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
           <UserPlus className="w-4 h-4" />
-          가족 초대
+          그룹 초대
         </h2>
         <div className="bg-gray-50 rounded-xl p-4 text-center mb-3">
           <p className="text-xs text-gray-500 mb-1">초대 코드</p>
@@ -255,7 +255,7 @@ export default function FamilyPage() {
         <div className="bg-white border border-gray-100 rounded-2xl p-5">
           <h2 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
             <Share2 className="w-4 h-4" />
-            가족 공유 항목 ({sharedItems.length}개)
+            그룹 공유 항목 ({sharedItems.length}개)
           </h2>
           <div className="space-y-2">
             {sharedItems.map((item) => (

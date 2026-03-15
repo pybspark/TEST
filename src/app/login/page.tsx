@@ -73,7 +73,7 @@ export default function LoginPage() {
             <Cloud className="w-7 h-7 text-white" />
           </div>
           <h1 className="text-2xl font-bold text-gray-900">BIN CLOUD</h1>
-          <p className="text-gray-500 text-sm mt-1">가족과 함께하는 개인 클라우드</p>
+          <p className="text-gray-500 text-sm mt-1">클라우드 저장소소</p>
         </div>
 
         <div className="flex bg-gray-100 rounded-xl p-1 mb-6">
@@ -150,7 +150,7 @@ export default function LoginPage() {
 
         {mode === 'signup' && (
           <p className="text-center text-xs text-gray-400 mt-4">
-            초대 코드는 가족 관리 페이지에서 확인할 수 있어요
+            초대 코드는 관리 페이지에서 확인할 수 있어요
           </p>
         )}
       </div>

@@ -1,7 +1,7 @@
 'use client'
 import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase'
-import { Users, Copy, UserPlus, Crown, CheckCircle, Share2 } from 'lucide-react'
+import { Users, Copy, UserPlus, Crown, CheckCircle, Share2, KeyRound } from 'lucide-react'
 import { toast } from 'sonner'
 
 interface Member {
@@ -35,6 +35,10 @@ export default function FamilyPage() {
   const [loading, setLoading] = useState(true)
   const [currentUserId, setCurrentUserId] = useState<string | null>(null)
   const [groupName, setGroupName] = useState('')
+  const [resetTargetMember, setResetTargetMember] = useState<Member | null>(null)
+  const [resetPassword, setResetPassword] = useState('')
+  const [resetPasswordConfirm, setResetPasswordConfirm] = useState('')
+  const [resetLoading, setResetLoading] = useState(false)
   const supabase = createClient()
 
   async function fetchData() {
@@ -128,6 +132,37 @@ export default function FamilyPage() {
     return name?.slice(0, 1) || '?'
   }
 
+  async function submitResetPassword() {
+    if (!resetTargetMember || resetPassword.length < 6) {
+      toast.error('비밀번호는 6자 이상 입력해 주세요')
+      return
+    }
+    if (resetPassword !== resetPasswordConfirm) {
+      toast.error('비밀번호가 일치하지 않습니다')
+      return
+    }
+    setResetLoading(true)
+    try {
+      const res = await fetch('/api/admin/reset-member-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: resetTargetMember.user_id, newPassword: resetPassword }),
+      })
+      const data = await res.json()
+      if (!res.ok) {
+        toast.error(data.error || '재설정 실패')
+        return
+      }
+      toast.success('비밀번호가 재설정되었습니다')
+      setResetTargetMember(null)
+      setResetPassword('')
+      setResetPasswordConfirm('')
+    } finally {
+      setResetLoading(false)
+    }
+  }
+
+  const isOwner = members.some((m) => m.user_id === currentUserId && m.role === 'owner')
   const avatarColors = ['bg-blue-100 text-blue-700', 'bg-green-100 text-green-700', 'bg-pink-100 text-pink-700', 'bg-purple-100 text-purple-700']
 
   if (loading) {
@@ -224,7 +259,7 @@ export default function FamilyPage() {
         </h2>
         <div className="space-y-2">
           {members.map((member, idx) => (
-            <div key={member.id} className="flex items-center gap-3 py-2">
+            <div key={member.id} className="flex items-center gap-3 py-2 flex-wrap">
               <div className={`w-9 h-9 rounded-full flex items-center justify-center text-sm font-semibold flex-shrink-0 ${avatarColors[idx % avatarColors.length]}`}>
                 {getInitials(member.profiles?.name || member.profiles?.email || '?')}
               </div>
@@ -237,14 +272,29 @@ export default function FamilyPage() {
                 </p>
                 <p className="text-xs text-gray-400 truncate">{member.profiles?.email}</p>
               </div>
-              {member.role === 'owner' ? (
-                <div className="flex items-center gap-1 px-2 py-1 bg-yellow-50 rounded-lg">
-                  <Crown className="w-3 h-3 text-yellow-600" />
-                  <span className="text-xs text-yellow-700 font-medium">관리자</span>
-                </div>
-              ) : (
-                <span className="text-xs text-gray-400">구성원</span>
-              )}
+              <div className="flex items-center gap-2 flex-shrink-0">
+                {member.role === 'owner' ? (
+                  <div className="flex items-center gap-1 px-2 py-1 bg-yellow-50 rounded-lg">
+                    <Crown className="w-3 h-3 text-yellow-600" />
+                    <span className="text-xs text-yellow-700 font-medium">관리자</span>
+                  </div>
+                ) : (
+                  <>
+                    <span className="text-xs text-gray-400">구성원</span>
+                    {isOwner && (
+                      <button
+                        type="button"
+                        onClick={() => setResetTargetMember(member)}
+                        className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-brand-700 bg-brand-50 rounded-lg hover:bg-brand-100 transition-colors border border-brand-200"
+                        title="비밀번호 재설정"
+                      >
+                        <KeyRound className="w-3.5 h-3.5" />
+                        비밀번호 재설정
+                      </button>
+                    )}
+                  </>
+                )}
+              </div>
             </div>
           ))}
         </div>
@@ -269,6 +319,51 @@ export default function FamilyPage() {
                 <CheckCircle className="w-4 h-4 text-green-500 flex-shrink-0" />
               </div>
             ))}
+          </div>
+        </div>
+      )}
+
+      {/* 비밀번호 재설정 모달 */}
+      {resetTargetMember && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50" onClick={() => !resetLoading && setResetTargetMember(null)}>
+          <div className="w-full max-w-sm bg-white rounded-2xl p-5 shadow-xl space-y-4" onClick={(e) => e.stopPropagation()}>
+            <h3 className="text-sm font-semibold text-gray-800">비밀번호 재설정</h3>
+            <p className="text-xs text-gray-500">
+              <span className="font-medium text-gray-700">{resetTargetMember.profiles?.name || resetTargetMember.profiles?.email}</span> 님의 새 비밀번호를 입력하세요.
+            </p>
+            <input
+              type="password"
+              placeholder="새 비밀번호 (6자 이상)"
+              value={resetPassword}
+              onChange={(e) => setResetPassword(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-brand-400"
+              autoComplete="new-password"
+            />
+            <input
+              type="password"
+              placeholder="비밀번호 확인"
+              value={resetPasswordConfirm}
+              onChange={(e) => setResetPasswordConfirm(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-brand-400"
+              autoComplete="new-password"
+            />
+            <div className="flex gap-2 pt-1">
+              <button
+                type="button"
+                onClick={() => !resetLoading && setResetTargetMember(null)}
+                className="flex-1 py-2.5 text-sm font-medium text-gray-600 bg-gray-100 rounded-xl hover:bg-gray-200 transition-colors"
+              >
+                취소
+              </button>
+              <button
+                type="button"
+                onClick={submitResetPassword}
+                disabled={resetLoading}
+                className="flex-1 py-2.5 text-sm font-medium text-white bg-brand-600 rounded-xl hover:bg-brand-800 transition-colors disabled:opacity-50"
+              >
+                {resetLoading ? '처리 중…' : '재설정'}
+              </button>
+            </div>
           </div>
         </div>
       )}

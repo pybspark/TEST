@@ -4,6 +4,7 @@ import { formatDistanceToNow } from 'date-fns'
 import { ko } from 'date-fns/locale'
 import { Image, Video, FileText } from 'lucide-react'
 import AdminSubscriberList from './AdminSubscriberList'
+import AdminInviteCode from './AdminInviteCode'
 
 // ⚠️ 여기에 본인 이메일 입력
 const ADMIN_EMAIL = 'pybspark@gmail.com'
@@ -17,11 +18,18 @@ export default async function AdminPage() {
     redirect('/dashboard')
   }
 
-  // 전체 유저 목록
-  const { data: profiles } = await supabase
+  // 그룹에 속한 user_id 목록 (그룹에서 제거하면 이 목록에서 사라짐)
+  const { data: familyMemberRows } = await supabase
+    .from('family_members')
+    .select('user_id')
+  const groupMemberIds = [...new Set((familyMemberRows || []).map((r) => r.user_id))]
+
+  // 가입자 목록 = 그룹에 속한 사람만 (그룹에서 제거하면 목록에서 탈퇴)
+  const { data: allProfiles } = await supabase
     .from('profiles')
     .select('*')
     .order('created_at', { ascending: false })
+  const profiles = (allProfiles || []).filter((p) => groupMemberIds.includes(p.id))
 
   // 전체 파일
   const { data: allFiles } = await supabase
@@ -39,6 +47,18 @@ export default async function AdminPage() {
 
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
 
+  // 관리자(owner)인 그룹의 초대 코드 (관리자 페이지에서 표시·재생성)
+  const { data: adminGroup } = await supabase
+    .from('family_members')
+    .select('group_id')
+    .eq('user_id', user.id)
+    .eq('role', 'owner')
+    .maybeSingle()
+  const { data: groupRow } = adminGroup
+    ? await supabase.from('family_groups').select('invite_code').eq('id', adminGroup.group_id).maybeSingle()
+    : { data: null }
+  const inviteCode = groupRow?.invite_code ?? null
+
   return (
     <div className="p-6 max-w-5xl mx-auto">
       <div className="flex items-center gap-3 mb-6">
@@ -55,7 +75,7 @@ export default async function AdminPage() {
       <div className="grid grid-cols-3 gap-3 mb-8">
         <div className="bg-white border border-gray-100 rounded-xl p-4">
           <p className="text-2xl font-bold text-gray-900">{profiles?.length || 0}</p>
-          <p className="text-xs text-gray-500 mt-1">전체 가입자</p>
+          <p className="text-xs text-gray-500 mt-1">그룹 멤버 (가입자 목록)</p>
         </div>
         <div className="bg-white border border-gray-100 rounded-xl p-4">
           <p className="text-2xl font-bold text-gray-900">{allFiles?.length || 0}</p>
@@ -67,7 +87,10 @@ export default async function AdminPage() {
         </div>
       </div>
 
-      {/* 가입자 목록 */}
+      {/* 초대 코드 (버튼으로 새 코드 생성 가능) */}
+      <AdminInviteCode initialInviteCode={inviteCode} />
+
+      {/* 가입자 목록 (그룹에 속한 사람만, 그룹에서 제거하면 여기서 사라짐) */}
       <h2 className="text-sm font-semibold text-gray-700 mb-3">가입자 목록</h2>
       <AdminSubscriberList
         profiles={profiles || []}

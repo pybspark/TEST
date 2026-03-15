@@ -1,7 +1,7 @@
 'use client'
 import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase'
-import { Users, Copy, UserPlus, Crown, CheckCircle, Share2 } from 'lucide-react'
+import { Users, UserPlus, Crown, CheckCircle, Share2 } from 'lucide-react'
 import { toast } from 'sonner'
 
 interface Member {
@@ -113,17 +113,6 @@ export default function FamilyPage() {
     fetchData()
   }
 
-  function copyInviteCode() {
-    navigator.clipboard.writeText(group?.invite_code || '')
-    toast.success('초대 코드가 복사되었습니다!')
-  }
-
-  function copyInviteLink() {
-    const link = `${window.location.origin}/invite?code=${group?.invite_code}`
-    navigator.clipboard.writeText(link)
-    toast.success('초대 링크가 복사되었습니다!')
-  }
-
   function getInitials(name: string) {
     return name?.slice(0, 1) || '?'
   }
@@ -184,37 +173,6 @@ export default function FamilyPage() {
             저장
           </button>
         </div>
-      </div>
-
-      {/* 초대 코드 */}
-      <div className="bg-white border border-gray-100 rounded-2xl p-5">
-        <h2 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
-          <UserPlus className="w-4 h-4" />
-          그룹 초대
-        </h2>
-        <div className="bg-gray-50 rounded-xl p-4 text-center mb-3">
-          <p className="text-xs text-gray-500 mb-1">초대 코드</p>
-          <p className="text-3xl font-bold tracking-[0.3em] text-gray-900">{group.invite_code}</p>
-        </div>
-        <div className="grid grid-cols-2 gap-2">
-          <button
-            onClick={copyInviteCode}
-            className="flex items-center justify-center gap-2 py-2.5 bg-gray-100 text-gray-700 rounded-xl text-sm font-medium hover:bg-gray-200 transition-colors"
-          >
-            <Copy className="w-3.5 h-3.5" />
-            코드 복사
-          </button>
-          <button
-            onClick={copyInviteLink}
-            className="flex items-center justify-center gap-2 py-2.5 bg-brand-600 text-white rounded-xl text-sm font-medium hover:bg-brand-800 transition-colors"
-          >
-            <Share2 className="w-3.5 h-3.5" />
-            링크 공유
-          </button>
-        </div>
-        <p className="text-xs text-gray-400 text-center mt-3">
-          초대 링크를 카톡으로 보내면 바로 가입할 수 있어요
-        </p>
       </div>
 
       {/* 구성원 */}

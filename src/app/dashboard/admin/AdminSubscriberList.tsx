@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { KeyRound, UserMinus } from 'lucide-react'
+import { KeyRound, UserMinus, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
 
 type Profile = { id: string; name: string | null; email: string | null }
@@ -21,6 +21,8 @@ export default function AdminSubscriberList({ profiles, allFiles, allNotes }: Ad
   const [loading, setLoading] = useState(false)
   const [removeTarget, setRemoveTarget] = useState<Profile | null>(null)
   const [removeLoading, setRemoveLoading] = useState(false)
+  const [deleteTarget, setDeleteTarget] = useState<Profile | null>(null)
+  const [deleteLoading, setDeleteLoading] = useState(false)
 
   const avatarColors = ['bg-blue-100 text-blue-700', 'bg-green-100 text-green-700', 'bg-pink-100 text-pink-700', 'bg-purple-100 text-purple-700']
   const ADMIN_EMAIL = 'pybspark@gmail.com'
@@ -88,6 +90,33 @@ export default function AdminSubscriberList({ profiles, allFiles, allNotes }: Ad
     }
   }
 
+  async function submitDeleteAccount() {
+    if (!deleteTarget) return
+    const userIdToDelete = deleteTarget.id
+    setDeleteLoading(true)
+    try {
+      const res = await fetch('/api/admin/delete-user', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: userIdToDelete }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        toast.error(data.error || '계정 삭제 실패')
+        setDeleteTarget(null)
+        return
+      }
+      toast.success('계정과 업로드한 파일·메모가 모두 삭제되었습니다.')
+      setDeleteTarget(null)
+      window.location.reload()
+    } catch {
+      toast.error('네트워크 오류가 발생했습니다. 다시 시도해 주세요.')
+      setDeleteTarget(null)
+    } finally {
+      setDeleteLoading(false)
+    }
+  }
+
   return (
     <>
       <div className="bg-white border border-gray-100 rounded-2xl overflow-hidden mb-8">
@@ -121,15 +150,26 @@ export default function AdminSubscriberList({ profiles, allFiles, allNotes }: Ad
                   비밀번호 재설정
                 </button>
                 {profile.email !== ADMIN_EMAIL && (
-                  <button
-                    type="button"
-                    onClick={() => setRemoveTarget(profile)}
-                    className="flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium text-red-700 bg-red-50 rounded-lg hover:bg-red-100 border border-red-200"
-                    title="그룹에서만 제거 (계정 유지, 초대로 재가입 가능)"
-                  >
-                    <UserMinus className="w-3.5 h-3.5" />
-                    그룹에서 제거
-                  </button>
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => setRemoveTarget(profile)}
+                      className="flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium text-red-700 bg-red-50 rounded-lg hover:bg-red-100 border border-red-200"
+                      title="그룹에서만 제거 (계정 유지, 초대로 재가입 가능)"
+                    >
+                      <UserMinus className="w-3.5 h-3.5" />
+                      그룹에서 제거
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setDeleteTarget(profile)}
+                      className="flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium text-white bg-red-600 rounded-lg hover:bg-red-700"
+                      title="계정 완전 삭제 (파일·사진·메모 모두 삭제)"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                      계정 삭제
+                    </button>
+                  </>
                 )}
               </div>
             </div>
@@ -203,6 +243,34 @@ export default function AdminSubscriberList({ profiles, allFiles, allNotes }: Ad
                 className="flex-1 py-2.5 text-sm font-medium text-white bg-red-600 rounded-xl hover:bg-red-700 disabled:opacity-50"
               >
                 {removeLoading ? '처리 중…' : '제거'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {deleteTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50" onClick={() => !deleteLoading && setDeleteTarget(null)}>
+          <div className="w-full max-w-sm bg-white rounded-2xl p-5 shadow-xl space-y-4" onClick={e => e.stopPropagation()}>
+            <h3 className="text-sm font-semibold text-red-600">계정 삭제</h3>
+            <p className="text-xs text-gray-500">
+              <span className="font-medium text-gray-700">{deleteTarget.name || deleteTarget.email}</span> 님의 계정을 삭제합니다. 이 사용자가 올린 <strong>파일, 사진, 메모가 모두 삭제</strong>되며 복구할 수 없습니다. 정말 삭제할까요?
+            </p>
+            <div className="flex gap-2 pt-1">
+              <button
+                type="button"
+                onClick={() => !deleteLoading && setDeleteTarget(null)}
+                className="flex-1 py-2.5 text-sm font-medium text-gray-600 bg-gray-100 rounded-xl hover:bg-gray-200"
+              >
+                취소
+              </button>
+              <button
+                type="button"
+                onClick={submitDeleteAccount}
+                disabled={deleteLoading}
+                className="flex-1 py-2.5 text-sm font-medium text-white bg-red-600 rounded-xl hover:bg-red-700 disabled:opacity-50"
+              >
+                {deleteLoading ? '처리 중…' : '계정 삭제'}
               </button>
             </div>
           </div>

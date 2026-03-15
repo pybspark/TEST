@@ -1,5 +1,6 @@
 'use client'
 import { useState, useEffect, useCallback } from 'react'
+import { useSearchParams } from 'next/navigation'
 import { createClient, getFileUrl, formatFileSize } from '@/lib/supabase'
 import UploadZone from '@/components/features/UploadZone'
 import DocumentThumbnail from '@/components/features/DocumentThumbnail'
@@ -208,10 +209,11 @@ function getIconBg(mime: string) {
 }
 
 export default function FilesPage() {
+  const searchParams = useSearchParams()
   const [files, setFiles] = useState<FileRecord[]>([])
   const [fileFolders, setFileFolders] = useState<FileFolder[]>([])
   const [loading, setLoading] = useState(true)
-  const [showUpload, setShowUpload] = useState(false)
+  const [showUpload, setShowUpload] = useState(() => searchParams.get('upload') === '1')
   const [query, setQuery] = useState('')
   const [editingFileId, setEditingFileId] = useState<string | null>(null)
   const [editingFileName, setEditingFileName] = useState('')

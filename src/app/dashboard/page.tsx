@@ -9,8 +9,10 @@ export default async function DashboardPage() {
   const { data: { user } } = await supabase.auth.getUser()
 
   const { data: recentFiles } = await supabase
-    .from('files').select('*')
+    .from('files')
+    .select('*')
     .eq('owner_id', user!.id)
+    .or('is_secure.eq.false,is_secure.is.null')
     .eq('is_deleted', false)
     .order('created_at', { ascending: false })
     .limit(12)
@@ -41,7 +43,7 @@ export default async function DashboardPage() {
           <h1 className="text-xl font-bold text-gray-900">내 클라우드</h1>
           <p className="text-sm text-gray-500 mt-0.5">모든 파일을 한 눈에 확인하세요</p>
         </div>
-        <Link href="/dashboard/photos" className="flex items-center gap-2 px-4 py-2 bg-brand-600 text-white rounded-xl text-sm font-medium hover:bg-brand-800 transition-colors">
+        <Link href="/dashboard/files?upload=1" className="flex items-center gap-2 px-4 py-2 bg-brand-600 text-white rounded-xl text-sm font-medium hover:bg-brand-800 transition-colors">
           <Upload className="w-4 h-4" />업로드
         </Link>
       </div>

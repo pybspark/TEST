@@ -1,5 +1,6 @@
 'use client'
 import { useState, useEffect, useCallback, useRef } from 'react'
+import { useSearchParams } from 'next/navigation'
 import { createClient, getFileUrl } from '@/lib/supabase'
 import UploadZone from '@/components/features/UploadZone'
 import { Upload, X, Download, Trash2, Share2, ZoomIn, Pencil, FolderPlus, FolderOpen, ChevronRight } from 'lucide-react'
@@ -28,10 +29,11 @@ interface FileRecord {
 }
 
 export default function PhotosPage() {
+  const searchParams = useSearchParams()
   const [photos, setPhotos] = useState<FileRecord[]>([])
   const [photoFolders, setPhotoFolders] = useState<PhotoFolder[]>([])
   const [loading, setLoading] = useState(true)
-  const [showUpload, setShowUpload] = useState(false)
+  const [showUpload, setShowUpload] = useState(() => searchParams.get('upload') === '1')
   const [selected, setSelected] = useState<string | null>(null)
   const [editingName, setEditingName] = useState(false)
   const [editNameValue, setEditNameValue] = useState('')

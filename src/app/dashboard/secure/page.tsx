@@ -511,10 +511,19 @@ export default function SecureFolderPage() {
   }
 
   async function moveFileToFolder(fileId: string, folderId: string | null) {
-    const { error } = await supabase.from('files').update({ folder_id: folderId }).eq('id', fileId)
-    if (error) return toast.error('이동 실패')
+    const target = secureFiles.find((f) => f.id === fileId)
+    if (!target) {
+      toast.error('이동 실패: 파일을 찾을 수 없어요')
+      return
+    }
+    const { error } = await supabase.from('files').update({ folder_id: folderId }).eq('storage_path', target.storage_path)
+    if (error) {
+      toast.error(`이동 실패: ${error.message || '알 수 없는 오류'}`)
+      return
+    }
+    // 로컬 상태도 바로 반영
+    setSecureFiles((prev) => prev.map((f) => (f.id === fileId ? { ...f, folder_id: folderId } : f)))
     toast.success('이동했어요')
-    fetchSecureFiles()
   }
 
   async function deleteFolder(folderId: string) {
@@ -672,8 +681,8 @@ export default function SecureFolderPage() {
                     onDragLeave={() => setDragOverFolderId(null)}
                     onDrop={(e) => {
                       e.preventDefault()
-                      const fileId = e.dataTransfer.getData(DRAG_FILE_KEY)
-                      if (fileId) { moveFileToFolder(fileId, null); toast.success('폴더에서 빼냈어요') }
+                      const fileId = e.dataTransfer.getData(DRAG_FILE_KEY) || e.dataTransfer.getData('text/plain')
+                      if (fileId) { moveFileToFolder(fileId, null) }
                       setDragOverFolderId(null)
                       setDraggedFileId(null)
                     }}
@@ -733,13 +742,26 @@ export default function SecureFolderPage() {
                             onDragLeave={() => setDragOverFolderId(null)}
                             onDrop={(e) => {
                               e.preventDefault()
-                              const fileId = e.dataTransfer.getData(DRAG_FILE_KEY)
-                              if (fileId) { moveFileToFolder(fileId, folder.id); toast.success('폴더로 옮겼어요') }
+                              e.stopPropagation()
+                              const fileId = e.dataTransfer.getData(DRAG_FILE_KEY) || e.dataTransfer.getData('text/plain')
+                              if (fileId) { moveFileToFolder(fileId, folder.id) }
                               setDragOverFolderId(null)
                               setDraggedFileId(null)
                             }}
                           >
-                            <button onClick={() => setSelectedFileFolderId(folder.id)} className="flex-1 flex items-center gap-3 text-left min-w-0">
+                            <button
+                              type="button"
+                              onClick={() => setSelectedFileFolderId(folder.id)}
+                              onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); e.dataTransfer.dropEffect = 'move'; setDragOverFolderId(folder.id) }}
+                              onDrop={(e) => {
+                                e.preventDefault()
+                                e.stopPropagation()
+                                const fileId = e.dataTransfer.getData(DRAG_FILE_KEY) || e.dataTransfer.getData('text/plain')
+                                if (fileId) { moveFileToFolder(fileId, folder.id) }
+                                setDragOverFolderId(null)
+                                setDraggedFileId(null)
+                              }}
+                              className="flex-1 flex items-center gap-3 text-left min-w-0">
                               <div className="w-12 h-12 rounded-xl bg-amber-50 flex items-center justify-center flex-shrink-0"><FolderOpen className="w-6 h-6 text-amber-600" /></div>
                               <div className="min-w-0 flex-1">
                                 {editingFolderId === folder.id ? (
@@ -786,7 +808,7 @@ export default function SecureFolderPage() {
                       <div
                         key={f.id}
                         draggable
-                        onDragStart={(e) => { e.dataTransfer.setData(DRAG_FILE_KEY, f.id); e.dataTransfer.effectAllowed = 'move'; setDraggedFileId(f.id) }}
+                        onDragStart={(e) => { e.dataTransfer.setData(DRAG_FILE_KEY, f.id); e.dataTransfer.setData('text/plain', f.id); e.dataTransfer.effectAllowed = 'move'; setDraggedFileId(f.id) }}
                         onDragEnd={() => { setDraggedFileId(null); setDragOverFolderId(null) }}
                         onClick={() => setSelectedSecureFile(f)}
                         className={`bg-white rounded-2xl border border-gray-100 overflow-hidden hover:shadow-md transition-all flex flex-col group cursor-pointer ${draggedFileId === f.id ? 'opacity-50' : ''}`}

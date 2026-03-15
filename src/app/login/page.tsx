@@ -3,13 +3,14 @@ import { useState } from 'react'
 import { createClient } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
-import { Cloud, Mail, Lock, Eye, EyeOff } from 'lucide-react'
+import { Cloud, Mail, Lock, Eye, EyeOff, KeyRound } from 'lucide-react'
 
 export default function LoginPage() {
   const [mode, setMode] = useState<'login' | 'signup'>('login')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [name, setName] = useState('')
+  const [inviteCode, setInviteCode] = useState('')
   const [showPw, setShowPw] = useState(false)
   const [loading, setLoading] = useState(false)
   const router = useRouter()
@@ -25,12 +26,36 @@ export default function LoginPage() {
         router.push('/dashboard')
         router.refresh()
       } else {
-        const { error } = await supabase.auth.signUp({
+        // 초대 코드 확인
+        const { data: group } = await supabase
+          .from('family_groups')
+          .select('id, name')
+          .eq('invite_code', inviteCode.trim())
+          .single()
+
+        if (!group) {
+          toast.error('올바르지 않은 초대 코드예요')
+          setLoading(false)
+          return
+        }
+
+        // 가입 진행
+        const { data: signUpData, error } = await supabase.auth.signUp({
           email, password,
           options: { data: { name } }
         })
         if (error) throw error
-        toast.success('가입 완료! 이메일을 확인해주세요.')
+
+        // 가족 그룹에 자동 추가
+        if (signUpData.user) {
+          await supabase.from('family_members').insert({
+            group_id: group.id,
+            user_id: signUpData.user.id,
+            role: 'member',
+          })
+        }
+
+        toast.success(`"${group.name}"에 참여했어요! 로그인해주세요 🎉`)
         setMode('login')
       }
     } catch (err: any) {
@@ -43,16 +68,14 @@ export default function LoginPage() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-white flex items-center justify-center p-4">
       <div className="w-full max-w-sm">
-        {/* 로고 */}
         <div className="text-center mb-8">
           <div className="inline-flex items-center justify-center w-14 h-14 bg-brand-600 rounded-2xl mb-4 shadow-lg">
             <Cloud className="w-7 h-7 text-white" />
           </div>
           <h1 className="text-2xl font-bold text-gray-900">BIN CLOUD</h1>
-          <p className="text-gray-500 text-sm mt-1">빈의 개인 클라우드</p>
+          <p className="text-gray-500 text-sm mt-1">가족과 함께하는 개인 클라우드</p>
         </div>
 
-        {/* 탭 */}
         <div className="flex bg-gray-100 rounded-xl p-1 mb-6">
           {(['login', 'signup'] as const).map((m) => (
             <button
@@ -67,19 +90,29 @@ export default function LoginPage() {
           ))}
         </div>
 
-        {/* 폼 */}
         <form onSubmit={handleSubmit} className="space-y-3">
           {mode === 'signup' && (
-            <div className="relative">
+            <>
               <input
                 type="text"
-                placeholder="이름"
+                placeholder="이름 (예: 아빠, 엄마)"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 required
-                className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-brand-400 focus:border-transparent"
+                className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-brand-400"
               />
-            </div>
+              <div className="relative">
+                <KeyRound className="absolute left-3 top-3.5 w-4 h-4 text-gray-400" />
+                <input
+                  type="text"
+                  placeholder="초대 코드 입력 (필수)"
+                  value={inviteCode}
+                  onChange={(e) => setInviteCode(e.target.value)}
+                  required
+                  className="w-full pl-10 pr-4 py-3 bg-white border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-brand-400"
+                />
+              </div>
+            </>
           )}
           <div className="relative">
             <Mail className="absolute left-3 top-3.5 w-4 h-4 text-gray-400" />
@@ -89,7 +122,7 @@ export default function LoginPage() {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
-              className="w-full pl-10 pr-4 py-3 bg-white border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-brand-400 focus:border-transparent"
+              className="w-full pl-10 pr-4 py-3 bg-white border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-brand-400"
             />
           </div>
           <div className="relative">
@@ -100,7 +133,7 @@ export default function LoginPage() {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
-              className="w-full pl-10 pr-10 py-3 bg-white border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-brand-400 focus:border-transparent"
+              className="w-full pl-10 pr-10 py-3 bg-white border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-brand-400"
             />
             <button type="button" onClick={() => setShowPw(!showPw)} className="absolute right-3 top-3.5">
               {showPw ? <EyeOff className="w-4 h-4 text-gray-400" /> : <Eye className="w-4 h-4 text-gray-400" />}
@@ -115,11 +148,11 @@ export default function LoginPage() {
           </button>
         </form>
 
-        {/* 초대 코드로 가입 */}
-        <p className="text-center text-xs text-gray-400 mt-6">
-          지인에게 초대받으셨나요?{' '}
-          <a href="/invite" className="text-brand-600 font-medium">초대 코드 입력</a>
-        </p>
+        {mode === 'signup' && (
+          <p className="text-center text-xs text-gray-400 mt-4">
+            초대 코드는 가족 관리 페이지에서 확인할 수 있어요
+          </p>
+        )}
       </div>
     </div>
   )

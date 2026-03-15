@@ -2,7 +2,9 @@
 import { useState, useEffect, useCallback } from 'react'
 import { createClient, getFileUrl, formatFileSize } from '@/lib/supabase'
 import UploadZone from '@/components/features/UploadZone'
-import { Upload, FileText, Trash2, Download, Share2, Search, Pencil, FolderPlus, FolderOpen, ChevronRight } from 'lucide-react'
+import DocumentThumbnail from '@/components/features/DocumentThumbnail'
+import { useSignedFileUrl } from '@/hooks/useSignedFileUrl'
+import { Upload, FileText, Trash2, Download, Share2, Search, Pencil, FolderPlus, FolderOpen, ChevronRight, X } from 'lucide-react'
 import { useMyGroups } from '@/hooks/useMyGroups'
 import ShareGroupDropdown from '@/components/ui/ShareGroupDropdown'
 import { formatDistanceToNow } from 'date-fns'
@@ -25,7 +27,169 @@ interface FileRecord {
   is_shared: boolean
   group_id: string | null
   file_folder_id?: string | null
+  memo?: string | null
+  memo_updated_at?: string | null
   profiles?: { name: string | null }
+}
+
+function isOfficePreviewType(mime: string): boolean {
+  if (!mime) return false
+  const lower = mime.toLowerCase()
+  return (
+    lower.includes('word') || lower.includes('document') || lower.includes('sheet') || lower.includes('excel') ||
+    lower.includes('powerpoint') || lower.includes('presentation') ||
+    lower === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' ||
+    lower === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' ||
+    lower === 'application/vnd.openxmlformats-officedocument.presentationml.presentation' ||
+    lower.includes('msword') || lower.includes('ms-excel') || lower.includes('ms-powerpoint') || lower.includes('opendocument')
+  )
+}
+
+/** 일반 파일 미리보기 모달: 보안 폴더 파일 모달과 동일한 디자인 */
+function FilePreviewModal({
+  file,
+  onClose,
+  onDownload,
+  onDelete,
+  onRename,
+  onSaveMemo,
+}: {
+  file: FileRecord
+  onClose: () => void
+  onDownload: (path: string, name: string) => void
+  onDelete: (id: string, path: string) => void
+  onRename: (id: string, name: string) => void
+  onSaveMemo: (fileId: string, memo: string) => void
+}) {
+  const { url, loading } = useSignedFileUrl('family-files', file.storage_path, 300)
+  const [editingName, setEditingName] = useState(false)
+  const [editValue, setEditValue] = useState(file.name)
+  const [memoValue, setMemoValue] = useState(file.memo ?? '')
+  const [memoSaving, setMemoSaving] = useState(false)
+  const [previewPdfUrl, setPreviewPdfUrl] = useState<string | null>(null)
+  const [previewLoading, setPreviewLoading] = useState(false)
+  const [previewError, setPreviewError] = useState<'none' | 'unavailable' | 'failed'>('none')
+
+  useEffect(() => { setEditValue(file.name) }, [file.name])
+  useEffect(() => { setMemoValue(file.memo ?? '') }, [file.memo])
+
+  const isPdf = file.mime_type === 'application/pdf'
+  const isOffice = isOfficePreviewType(file.mime_type)
+
+  useEffect(() => {
+    if (!isOffice || !file.storage_path) {
+      setPreviewPdfUrl(null)
+      setPreviewError('none')
+      return
+    }
+    let cancelled = false
+    setPreviewLoading(true)
+    setPreviewError('none')
+    setPreviewPdfUrl(null)
+    fetch('/api/preview-document', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ storagePath: file.storage_path }),
+    })
+      .then((r) => r.json().then((d) => ({ ok: r.ok, status: r.status, data: d })))
+      .then(({ ok, data }) => {
+        if (cancelled) return
+        setPreviewLoading(false)
+        if (ok && data?.url) {
+          setPreviewPdfUrl(data.url)
+          setPreviewError('none')
+        } else {
+          setPreviewError('unavailable')
+        }
+      })
+      .catch(() => {
+        if (!cancelled) { setPreviewLoading(false); setPreviewError('failed') }
+      })
+    return () => { cancelled = true }
+  }, [file.storage_path, isOffice])
+
+  const saveRename = () => {
+    const trimmed = editValue.trim()
+    if (trimmed && trimmed !== file.name) onRename(file.id, trimmed)
+    setEditingName(false)
+  }
+  const handleSaveMemo = async () => {
+    setMemoSaving(true)
+    await onSaveMemo(file.id, memoValue)
+    setMemoSaving(false)
+  }
+
+  const showPdfInIframe = isPdf && url
+  const showOfficePdfInIframe = isOffice && previewPdfUrl && !previewLoading
+  const showFallback = !showPdfInIframe && !showOfficePdfInIframe && (url || isOffice)
+
+  return (
+    <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4" onClick={onClose}>
+      <div className="bg-white rounded-2xl overflow-hidden max-w-3xl w-full max-h-[90vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
+        <div className="flex-1 min-h-[200px] flex flex-col bg-gray-50 overflow-hidden">
+          {loading && !isOffice ? (
+            <div className="w-full flex-1 min-h-[40vh] bg-gray-100 animate-pulse" />
+          ) : (showPdfInIframe || showOfficePdfInIframe) ? (
+            <iframe src={showPdfInIframe ? url! : previewPdfUrl!} title={file.name} className="w-full flex-1 min-h-[50vh] border-0 bg-white" />
+          ) : previewLoading && isOffice ? (
+            <div className="flex-1 min-h-[40vh] flex flex-col items-center justify-center gap-3 bg-gray-100">
+              <div className="w-8 h-8 border-2 border-brand-500 border-t-transparent rounded-full animate-spin" />
+              <p className="text-sm text-gray-500">미리보기 준비 중…</p>
+            </div>
+          ) : showFallback ? (
+            <div className="flex-1 min-h-[40vh] flex flex-col items-center justify-center gap-4 p-6">
+              <DocumentThumbnail bucket="family-files" storagePath={file.storage_path} mimeType={file.mime_type} fallback={<FileText className="w-16 h-16 text-gray-400" />} className="max-w-full max-h-[45vh] w-auto h-auto" />
+              {previewError === 'unavailable' && <p className="text-xs text-gray-500 text-center">문서 미리보기는 서버 설정 후 이용할 수 있어요</p>}
+              {previewError === 'failed' && <p className="text-xs text-amber-600 text-center">미리보기를 불러오지 못했어요</p>}
+              <a href={url || getFileUrl('family-files', file.storage_path)} target="_blank" rel="noopener noreferrer" className="px-4 py-2 bg-brand-600 text-white rounded-xl text-sm font-medium hover:bg-brand-700">
+                새 탭에서 열기
+              </a>
+            </div>
+          ) : (
+            <div className="flex-1 min-h-[40vh] flex items-center justify-center text-gray-400">로드 실패</div>
+          )}
+        </div>
+        <div className="p-4 border-t border-gray-100 space-y-4">
+          <div className="flex items-center gap-2 flex-wrap">
+            {editingName ? (
+              <>
+                <input type="text" value={editValue} onChange={(e) => setEditValue(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && saveRename()} className="flex-1 min-w-0 px-3 py-1.5 border border-gray-200 rounded-lg text-sm" autoFocus />
+                <button type="button" onClick={saveRename} className="px-3 py-1.5 bg-brand-600 text-white rounded-lg text-sm">저장</button>
+                <button type="button" onClick={() => { setEditingName(false); setEditValue(file.name) }} className="px-3 py-1.5 text-gray-500 rounded-lg text-sm">취소</button>
+              </>
+            ) : (
+              <>
+                <p className="text-sm font-medium text-gray-800 truncate flex-1 min-w-0">{file.name}</p>
+                <button type="button" onClick={() => { setEditValue(file.name); setEditingName(true) }} className="p-1.5 rounded-lg text-gray-400 hover:bg-gray-100" title="이름 변경"><Pencil className="w-4 h-4" /></button>
+              </>
+            )}
+          </div>
+          <div className="text-xs text-gray-500 space-y-1">
+            <p>업로드됨 · {formatDistanceToNow(new Date(file.created_at), { addSuffix: true, locale: ko })}</p>
+            {file.memo_updated_at && <p>메모 저장됨 · {formatDistanceToNow(new Date(file.memo_updated_at), { addSuffix: true, locale: ko })}</p>}
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-gray-500 mb-1">메모</label>
+            <textarea value={memoValue} onChange={(e) => setMemoValue(e.target.value)} placeholder="이 파일에 대한 메모를 적어보세요" rows={3} className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm resize-none focus:outline-none focus:ring-2 focus:ring-brand-400 focus:border-transparent" />
+            <button type="button" onClick={handleSaveMemo} disabled={memoSaving} className="mt-2 px-3 py-1.5 bg-gray-800 text-white rounded-lg text-sm font-medium hover:bg-gray-900 disabled:opacity-50">
+              {memoSaving ? '저장 중…' : '메모 저장'}
+            </button>
+          </div>
+          <div className="flex items-center gap-2 flex-wrap">
+            <button type="button" onClick={() => onDownload(file.storage_path, file.name)} className="flex items-center justify-center gap-2 px-4 py-2 bg-gray-100 text-gray-700 rounded-xl text-sm font-medium hover:bg-gray-200">
+              <Download className="w-4 h-4" /> 다운로드
+            </button>
+            <button type="button" onClick={() => { onDelete(file.id, file.storage_path); onClose() }} className="flex items-center justify-center gap-2 px-4 py-2 bg-red-50 text-red-500 rounded-xl text-sm font-medium hover:bg-red-100">
+              <Trash2 className="w-4 h-4" />
+            </button>
+            <button type="button" onClick={onClose} className="flex items-center justify-center p-2 bg-gray-100 text-gray-600 rounded-xl hover:bg-gray-200">
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
 }
 
 function getFileIcon(mime: string) {
@@ -56,6 +220,7 @@ export default function FilesPage() {
   const [showNewFolder, setShowNewFolder] = useState(false)
   const [editingFolderId, setEditingFolderId] = useState<string | null>(null)
   const [editingFolderName, setEditingFolderName] = useState('')
+  const [selectedFile, setSelectedFile] = useState<FileRecord | null>(null)
   const supabase = createClient()
   const { groups } = useMyGroups()
 
@@ -63,13 +228,14 @@ export default function FilesPage() {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return
     setLoading(true)
-    const selectCols = 'id, name, storage_path, size_bytes, mime_type, created_at, is_shared, group_id, file_folder_id, profiles(name)'
+    const selectCols = 'id, name, storage_path, size_bytes, mime_type, created_at, is_shared, group_id, file_folder_id, memo, memo_updated_at, profiles(name)'
     const { data, error } = await supabase
       .from('files')
       .select(selectCols)
       .eq('owner_id', user.id)
       .eq('file_type', 'file')
       .or('is_secure.eq.false,is_secure.is.null')
+      .eq('is_deleted', false)
       .order('created_at', { ascending: false })
     if (error && (error.message?.includes('file_folder_id') || error.message?.includes('column'))) {
       const { data: dataWithoutFolder } = await supabase
@@ -78,6 +244,7 @@ export default function FilesPage() {
         .eq('owner_id', user.id)
         .eq('file_type', 'file')
         .or('is_secure.eq.false,is_secure.is.null')
+        .eq('is_deleted', false)
         .order('created_at', { ascending: false })
       setFiles(
         (dataWithoutFolder || []).map((f: Record<string, unknown>): FileRecord => ({
@@ -90,6 +257,8 @@ export default function FilesPage() {
           is_shared: f.is_shared as boolean,
           group_id: f.group_id as string | null,
           file_folder_id: null,
+          memo: null,
+          memo_updated_at: null,
           profiles: Array.isArray(f.profiles) ? (f.profiles[0] as { name: string | null }) : (f.profiles as { name: string | null } | undefined),
         })
       ))
@@ -108,6 +277,8 @@ export default function FilesPage() {
           is_shared: f.is_shared as boolean,
           group_id: f.group_id as string | null,
           file_folder_id: (f.file_folder_id as string | null) ?? null,
+          memo: (f.memo as string | null) ?? null,
+          memo_updated_at: (f.memo_updated_at as string | null) ?? null,
           profiles: Array.isArray(f.profiles) ? (f.profiles[0] as { name: string | null }) ?? { name: null } : (f.profiles as { name: string | null } | undefined) ?? { name: null },
         }))
       )
@@ -177,9 +348,20 @@ export default function FilesPage() {
   }
 
   async function deleteFile(id: string, path: string) {
-    await supabase.storage.from('family-files').remove([path])
-    await supabase.from('files').delete().eq('id', id)
-    toast.success('삭제되었습니다')
+    const now = new Date().toISOString()
+    const { error } = await supabase.from('files').update({ is_deleted: true, deleted_at: now }).eq('id', id)
+    if (error) {
+      if (error.message?.includes('column') || error.message?.includes('is_deleted') || error.message?.includes('deleted_at')) {
+        await supabase.storage.from('family-files').remove([path])
+        const { error: delErr } = await supabase.from('files').delete().eq('id', id)
+        if (delErr) return toast.error('삭제에 실패했어요')
+        toast.success('삭제되었습니다')
+        setFiles((prev) => prev.filter((f) => f.id !== id))
+        return
+      }
+      return toast.error('삭제에 실패했어요')
+    }
+    toast.success('휴지통으로 이동했어요')
     setFiles((prev) => prev.filter((f) => f.id !== id))
   }
 
@@ -195,6 +377,22 @@ export default function FilesPage() {
     toast.success('이름이 변경되었습니다')
     setEditingFileId(null)
     setFiles((prev) => prev.map((f) => (f.id === id ? { ...f, name: newName } : f)))
+    if (selectedFile?.id === id) setSelectedFile((f) => (f ? { ...f, name: newName } : null))
+  }
+
+  async function saveFileMemo(fileId: string, memo: string) {
+    const { error } = await supabase.from('files').update({ memo, memo_updated_at: new Date().toISOString() }).eq('id', fileId)
+    if (error) return toast.error('메모 저장 실패')
+    toast.success('메모가 저장되었어요')
+    setFiles((prev) => prev.map((f) => (f.id === fileId ? { ...f, memo, memo_updated_at: new Date().toISOString() } : f)))
+    if (selectedFile?.id === fileId) setSelectedFile((f) => (f ? { ...f, memo, memo_updated_at: new Date().toISOString() } : null))
+  }
+
+  function triggerFileDownload(path: string, name: string) {
+    const a = document.createElement('a')
+    a.href = getFileUrl('family-files', path)
+    a.download = name
+    a.click()
   }
 
   const filtered = files.filter((f) =>
@@ -355,7 +553,15 @@ export default function FilesPage() {
                       <button type="button" onClick={() => setEditingFileId(null)} className="text-xs text-gray-500 shrink-0">취소</button>
                     </div>
                   ) : (
-                    <p className="text-sm text-gray-800 truncate">{file.name}</p>
+                    <p
+                      role="button"
+                      tabIndex={0}
+                      onClick={() => setSelectedFile(file)}
+                      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setSelectedFile(file) } }}
+                      className="text-sm text-gray-800 truncate cursor-pointer hover:text-brand-600 hover:underline"
+                    >
+                      {file.name}
+                    </p>
                   )}
                   <p className={`text-xs flex items-center gap-1 mt-0.5 ${file.is_shared ? 'text-brand-600' : 'text-gray-400'}`}>
                     <Share2 className="w-3 h-3 flex-shrink-0" />
@@ -409,6 +615,17 @@ export default function FilesPage() {
             </div>
           ))}
         </div>
+      )}
+
+      {selectedFile && (
+        <FilePreviewModal
+          file={selectedFile}
+          onClose={() => setSelectedFile(null)}
+          onDownload={triggerFileDownload}
+          onDelete={(id, path) => { deleteFile(id, path); setSelectedFile(null) }}
+          onRename={renameFile}
+          onSaveMemo={saveFileMemo}
+        />
       )}
     </div>
   )

@@ -28,11 +28,18 @@ interface SecureFile {
   created_at: string
   file_type?: string
   folder_id?: string | null
+  photo_folder_id?: string | null
   memo?: string | null
   memo_updated_at?: string | null
 }
 
 interface SecureFolder {
+  id: string
+  name: string
+  created_at: string
+}
+
+interface SecurePhotoFolder {
   id: string
   name: string
   created_at: string
@@ -65,18 +72,57 @@ async function triggerDownload(path: string, fileName: string) {
   }
 }
 
-/** 보안 폴더용: 카드 클릭 시 확대 모달, 다운로드는 항상 파일로 저장 */
-function SecurePhotoCard({ f, onSelect, onDownload, onDelete }: { f: SecureFile; onSelect: (f: SecureFile) => void; onDownload: (path: string, name: string) => void; onDelete: (id: string, path: string) => void }) {
+/** 보안 폴더용: 카드 클릭 시 확대 모달, 드래그·드롭다운으로 폴더 이동 */
+function SecurePhotoCard({
+  f,
+  photoFolders,
+  onSelect,
+  onDownload,
+  onDelete,
+  onMoveToFolder,
+  isDragging,
+  onDragStart,
+  onDragEnd,
+}: {
+  f: SecureFile
+  photoFolders: SecurePhotoFolder[]
+  onSelect: (f: SecureFile) => void
+  onDownload: (path: string, name: string) => void
+  onDelete: (id: string, path: string) => void
+  onMoveToFolder: (photoId: string, folderId: string | null) => void
+  isDragging?: boolean
+  onDragStart?: () => void
+  onDragEnd?: () => void
+}) {
   const { url, loading } = useSignedFileUrl('family-files', f.storage_path, 300)
   return (
     <div
-      className="bg-white rounded-2xl border border-gray-100 overflow-hidden hover:shadow-md transition-shadow flex flex-col cursor-pointer"
+      className={`bg-white rounded-2xl border border-gray-100 overflow-hidden hover:shadow-md transition-shadow flex flex-col cursor-pointer ${isDragging ? 'opacity-50' : ''}`}
       onClick={() => onSelect(f)}
+      draggable
+      onDragStart={(e) => {
+        e.dataTransfer.setData('application/x-secure-photo-id', f.id)
+        e.dataTransfer.setData('text/plain', f.id)
+        e.dataTransfer.effectAllowed = 'move'
+        onDragStart?.()
+      }}
+      onDragEnd={() => onDragEnd?.()}
     >
       <div className="aspect-square min-h-[140px] bg-gray-50 flex items-center justify-center relative group">
         {loading ? <div className="w-full h-full bg-gray-100 animate-pulse" /> : url ? <img src={url} alt="" className="w-full h-full object-cover transition-transform group-hover:scale-105" /> : <div className="w-full h-full bg-gray-100 flex items-center justify-center text-gray-400 text-sm">로드 실패</div>}
         <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors flex items-end justify-end gap-1 p-3 opacity-0 group-hover:opacity-100 pointer-events-none">
-          <span className="pointer-events-auto flex gap-1">
+          <span className="pointer-events-auto flex gap-1 flex-wrap">
+            <select
+              className="text-xs rounded-lg border border-gray-200 bg-white/95 px-2 py-1 text-gray-600"
+              value=""
+              onChange={(e) => { e.stopPropagation(); const v = e.target.value; onMoveToFolder(f.id, v || null); e.target.value = '' }}
+              onClick={(e) => e.stopPropagation()}
+              title="폴더로 이동"
+            >
+              <option value="">이동...</option>
+              <option value="">📁 폴더 없음</option>
+              {photoFolders.map((fd) => <option key={fd.id} value={fd.id}>📁 {fd.name}</option>)}
+            </select>
             <button type="button" onClick={(e) => { e.stopPropagation(); onDownload(f.storage_path, f.name) }} className="p-2 rounded-lg bg-white/90 text-gray-700 hover:bg-white shadow"><Download className="w-4 h-4" /></button>
             <button type="button" onClick={(e) => { e.stopPropagation(); onDelete(f.id, f.storage_path) }} className="p-2 rounded-lg bg-white/90 text-red-500 hover:bg-white shadow"><Trash2 className="w-4 h-4" /></button>
           </span>
@@ -402,6 +448,12 @@ export default function SecureFolderPage() {
   const [secureNotes, setSecureNotes] = useState<SecureNote[]>([])
   const [secureFolders, setSecureFolders] = useState<SecureFolder[]>([])
   const [selectedFileFolderId, setSelectedFileFolderId] = useState<string | null>(null)
+  const [securePhotoFolders, setSecurePhotoFolders] = useState<SecurePhotoFolder[]>([])
+  const [selectedSecurePhotoFolderId, setSelectedSecurePhotoFolderId] = useState<string | null>(null)
+  const [showNewPhotoFolder, setShowNewPhotoFolder] = useState(false)
+  const [newPhotoFolderName, setNewPhotoFolderName] = useState('')
+  const [editingPhotoFolderId, setEditingPhotoFolderId] = useState<string | null>(null)
+  const [editingPhotoFolderName, setEditingPhotoFolderName] = useState('')
   const [newFolderName, setNewFolderName] = useState('')
   const [showNewFolder, setShowNewFolder] = useState(false)
   const [filesLoading, setFilesLoading] = useState(false)
@@ -411,6 +463,8 @@ export default function SecureFolderPage() {
   const [isNewNote, setIsNewNote] = useState(false)
   const [draggedFileId, setDraggedFileId] = useState<string | null>(null)
   const [dragOverFolderId, setDragOverFolderId] = useState<string | null>(null)
+  const [draggedSecurePhotoId, setDraggedSecurePhotoId] = useState<string | null>(null)
+  const [dragOverSecurePhotoFolderId, setDragOverSecurePhotoFolderId] = useState<string | null>(null)
   const [selectedSecurePhoto, setSelectedSecurePhoto] = useState<SecureFile | null>(null)
   const [selectedSecureVideo, setSelectedSecureVideo] = useState<SecureFile | null>(null)
   const [selectedSecureFile, setSelectedSecureFile] = useState<SecureFile | null>(null)
@@ -505,12 +559,13 @@ export default function SecureFolderPage() {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return
     setFilesLoading(true)
-    const selectCols = 'id, name, storage_path, size_bytes, mime_type, created_at, file_type, folder_id, memo, memo_updated_at'
+    const selectCols = 'id, name, storage_path, size_bytes, mime_type, created_at, file_type, folder_id, photo_folder_id, memo, memo_updated_at'
     const { data, error } = await supabase
       .from('files')
       .select(selectCols)
       .eq('owner_id', user.id)
       .eq('is_secure', true)
+      .or('is_deleted.eq.false,is_deleted.is.null')
       .order('created_at', { ascending: false })
     if (error && (error.message?.includes('folder_id') || error.message?.includes('column'))) {
       const { data: dataWithoutFolder } = await supabase
@@ -519,13 +574,13 @@ export default function SecureFolderPage() {
         .eq('owner_id', user.id)
         .eq('is_secure', true)
         .order('created_at', { ascending: false })
-      setSecureFiles((dataWithoutFolder || []).map((f) => ({ ...f, folder_id: null, memo: null, memo_updated_at: null })))
+      setSecureFiles((dataWithoutFolder || []).map((f) => ({ ...f, folder_id: null, photo_folder_id: null, memo: null, memo_updated_at: null })))
       if (error.message?.includes('folder_id')) toast.info('폴더 기능을 쓰려면 Supabase에서 add_secure_folders.sql을 실행해주세요.')
     } else if (error) {
       toast.error('파일 목록을 불러오지 못했어요. is_secure 컬럼이 있으면 add_is_secure.sql을 실행해주세요.')
       setSecureFiles([])
     } else {
-      setSecureFiles(data || [])
+      setSecureFiles((data || []).map((f) => ({ ...f, photo_folder_id: (f.photo_folder_id ?? null) as string | null })))
     }
     setFilesLoading(false)
   }, [supabase])
@@ -539,6 +594,17 @@ export default function SecureFolderPage() {
       .eq('owner_id', user.id)
       .order('created_at', { ascending: true })
     setSecureFolders(data || [])
+  }, [supabase])
+
+  const fetchSecurePhotoFolders = useCallback(async () => {
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return
+    const { data } = await supabase
+      .from('photo_folders')
+      .select('id, name, created_at')
+      .eq('owner_id', user.id)
+      .order('created_at', { ascending: true })
+    setSecurePhotoFolders(data || [])
   }, [supabase])
 
   const fetchSecureNotes = useCallback(async () => {
@@ -561,14 +627,73 @@ export default function SecureFolderPage() {
       fetchSecureFiles()
       fetchSecureNotes()
       fetchSecureFolders()
+      fetchSecurePhotoFolders()
     }
-  }, [unlocked, fetchSecureFiles, fetchSecureNotes, fetchSecureFolders])
+  }, [unlocked, fetchSecureFiles, fetchSecureNotes, fetchSecureFolders, fetchSecurePhotoFolders])
 
   async function deleteSecureFile(id: string, path: string) {
-    await supabase.storage.from('family-files').remove([path])
-    await supabase.from('files').delete().eq('id', id)
-    toast.success('삭제되었습니다')
+    const now = new Date().toISOString()
+    const { error } = await supabase.from('files').update({ is_deleted: true, deleted_at: now }).eq('id', id)
+    if (error) {
+      if (error.message?.includes('column') || error.message?.includes('is_deleted') || error.message?.includes('deleted_at')) {
+        await supabase.storage.from('family-files').remove([path])
+        const { error: delErr } = await supabase.from('files').delete().eq('id', id)
+        if (delErr) return toast.error('삭제에 실패했어요')
+        toast.success('삭제되었습니다')
+        fetchSecureFiles()
+        return
+      }
+      return toast.error('삭제에 실패했어요')
+    }
+    toast.success('휴지통으로 이동했어요')
     fetchSecureFiles()
+  }
+
+  async function createSecurePhotoFolder() {
+    const name = newPhotoFolderName.trim()
+    if (!name) return toast.error('폴더 이름을 입력하세요')
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return
+    const { error } = await supabase.from('photo_folders').insert({ owner_id: user.id, name })
+    if (error) return toast.error('폴더를 만들지 못했어요')
+    toast.success('폴더가 만들어졌어요')
+    setNewPhotoFolderName('')
+    setShowNewPhotoFolder(false)
+    fetchSecurePhotoFolders()
+  }
+
+  async function renameSecurePhotoFolder(folderId: string, newName: string) {
+    const trimmed = newName.trim()
+    if (!trimmed) return
+    const { error } = await supabase.from('photo_folders').update({ name: trimmed }).eq('id', folderId)
+    if (error) return toast.error('이름 변경 실패')
+    toast.success('이름이 변경되었어요')
+    setEditingPhotoFolderId(null)
+    fetchSecurePhotoFolders()
+  }
+
+  async function deleteSecurePhotoFolder(folderId: string) {
+    const res = await fetch('/api/photos/delete-folder', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ folderId }),
+    })
+    const data = await res.json().catch(() => ({}))
+    if (!res.ok) {
+      toast.error(data?.error || '폴더를 삭제하지 못했어요')
+      return
+    }
+    toast.success('폴더를 삭제했어요. 안의 사진은 폴더 없음으로 옮겨졌어요')
+    if (selectedSecurePhotoFolderId === folderId) setSelectedSecurePhotoFolderId(null)
+    setSecureFiles((prev) => prev.map((f) => f.photo_folder_id === folderId ? { ...f, photo_folder_id: null } : f))
+    fetchSecurePhotoFolders()
+  }
+
+  async function moveSecurePhotoToFolder(photoId: string, folderId: string | null) {
+    const { error } = await supabase.from('files').update({ photo_folder_id: folderId }).eq('id', photoId)
+    if (error) return toast.error('이동 실패')
+    toast.success('이동했어요')
+    setSecureFiles((prev) => prev.map((f) => (f.id === photoId ? { ...f, photo_folder_id: folderId } : f)))
   }
 
   async function createFolder() {
@@ -706,6 +831,11 @@ export default function SecureFolderPage() {
   const currentFolder = selectedFileFolderId ? secureFolders.find((f) => f.id === selectedFileFolderId) : null
   const filesInCurrentFolder = secureByType.files.filter((f) => (f.folder_id ?? null) === selectedFileFolderId)
   const rootFiles = secureByType.files.filter((f) => !f.folder_id)
+
+  const currentSecurePhotoFolder = selectedSecurePhotoFolderId ? securePhotoFolders.find((f) => f.id === selectedSecurePhotoFolderId) : null
+  const securePhotosInCurrentFolder = secureByType.photos.filter((f) => (f.photo_folder_id ?? null) === selectedSecurePhotoFolderId)
+  const secureRootPhotos = secureByType.photos.filter((f) => !f.photo_folder_id)
+  const displaySecurePhotos = selectedSecurePhotoFolderId ? securePhotosInCurrentFolder : secureRootPhotos
 
   if (hasPin === null) {
     return (
@@ -942,30 +1072,244 @@ export default function SecureFolderPage() {
         {/* 사진 탭 */}
         {tab === 'photos' && (
           <>
-            <div className="flex justify-end mb-3">
-              <button onClick={() => setShowUpload(!showUpload)} className="flex items-center gap-2 px-4 py-2 bg-brand-600 text-white rounded-xl text-sm font-medium hover:bg-brand-700">
-                <Upload className="w-4 h-4" /> 파일 올리기
-              </button>
+            <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
+              {selectedSecurePhotoFolderId ? (
+                <div className="flex items-center gap-2 text-sm flex-wrap">
+                  <span
+                    onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; setDragOverSecurePhotoFolderId('root') }}
+                    onDragLeave={() => setDragOverSecurePhotoFolderId(null)}
+                    onDrop={(e) => {
+                      e.preventDefault()
+                      const photoId = e.dataTransfer.getData('application/x-secure-photo-id') || e.dataTransfer.getData('text/plain')
+                      if (photoId) moveSecurePhotoToFolder(photoId, null)
+                      setDragOverSecurePhotoFolderId(null)
+                      setDraggedSecurePhotoId(null)
+                    }}
+                    className={`inline-flex items-center rounded-lg px-2 py-1 -ml-1 transition-colors ${dragOverSecurePhotoFolderId === 'root' ? 'bg-brand-100 text-brand-700' : ''}`}
+                  >
+                    <button
+                      type="button"
+                      onClick={() => setSelectedSecurePhotoFolderId(null)}
+                      className="text-gray-500 hover:text-gray-800"
+                    >
+                      전체
+                    </button>
+                  </span>
+                  <ChevronRight className="w-4 h-4 text-gray-400" />
+                  <span className="font-medium text-gray-800">{currentSecurePhotoFolder?.name}</span>
+                  <button
+                    onClick={() => currentSecurePhotoFolder && deleteSecurePhotoFolder(currentSecurePhotoFolder.id)}
+                    className="text-red-500 hover:text-red-600 text-xs ml-2"
+                  >
+                    폴더 삭제
+                  </button>
+                </div>
+              ) : (
+                <span className="text-sm text-gray-500">폴더를 만들고 사진을 분류해 보관하세요</span>
+              )}
+              <div className="flex gap-2">
+                {!selectedSecurePhotoFolderId && (
+                  <button
+                    onClick={() => setShowNewPhotoFolder(true)}
+                    className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 text-gray-700 rounded-xl text-sm font-medium hover:bg-gray-50"
+                  >
+                    <FolderPlus className="w-4 h-4" /> 새 폴더
+                  </button>
+                )}
+                <button
+                  onClick={() => setShowUpload(!showUpload)}
+                  className="flex items-center gap-2 px-4 py-2 bg-brand-600 text-white rounded-xl text-sm font-medium hover:bg-brand-700"
+                >
+                  <Upload className="w-4 h-4" /> 사진 추가
+                </button>
+              </div>
             </div>
-            {showUpload && (
-              <div className="mb-6 bg-white border border-gray-100 rounded-2xl p-4">
-                <UploadZone bucket="family-files" fileType="file" isSecure={true} onUploadComplete={() => { fetchSecureFiles(); setShowUpload(false) }} />
+
+            {showNewPhotoFolder && (
+              <div className="mb-4 p-4 bg-white border border-gray-100 rounded-2xl flex gap-2">
+                <input
+                  type="text"
+                  value={newPhotoFolderName}
+                  onChange={(e) => setNewPhotoFolderName(e.target.value)}
+                  placeholder="폴더 이름"
+                  className="flex-1 px-4 py-2 border border-gray-200 rounded-xl text-sm"
+                  onKeyDown={(e) => e.key === 'Enter' && createSecurePhotoFolder()}
+                />
+                <button
+                  onClick={createSecurePhotoFolder}
+                  className="px-4 py-2 bg-brand-600 text-white rounded-xl text-sm font-medium"
+                >
+                  만들기
+                </button>
+                <button
+                  onClick={() => { setShowNewPhotoFolder(false); setNewPhotoFolderName('') }}
+                  className="px-4 py-2 text-gray-500 hover:bg-gray-100 rounded-xl text-sm"
+                >
+                  취소
+                </button>
               </div>
             )}
+
+            {showUpload && (
+              <div className="mb-6 bg-white border border-gray-100 rounded-2xl p-4">
+                <UploadZone
+                  bucket="family-files"
+                  fileType="photo"
+                  isSecure={true}
+                  photoFolderId={selectedSecurePhotoFolderId}
+                  onUploadComplete={() => { fetchSecureFiles(); setShowUpload(false) }}
+                />
+              </div>
+            )}
+
             {filesLoading ? (
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">{[1,2,3,4].map((i) => <div key={i} className="aspect-square bg-gray-100 rounded-2xl animate-pulse" />)}</div>
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+                {[1, 2, 3, 4].map((i) => (
+                  <div key={i} className="aspect-square bg-gray-100 rounded-2xl animate-pulse" />
+                ))}
+              </div>
             ) : secureByType.photos.length === 0 ? (
               <div className="bg-white rounded-2xl border border-dashed border-gray-200 p-12 text-center">
                 <Image className="w-10 h-10 text-gray-300 mx-auto mb-3" />
                 <p className="text-sm text-gray-400">사진이 없어요</p>
-                <p className="text-xs text-gray-400 mt-1">파일 올리기로 이미지를 추가하세요</p>
+                <p className="text-xs text-gray-400 mt-1">위의 사진 추가 버튼으로 이미지를 업로드하세요</p>
               </div>
             ) : (
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
-                {secureByType.photos.map((f) => (
-                  <SecurePhotoCard key={f.id} f={f} onSelect={(file) => setSelectedSecurePhoto(file)} onDownload={async (path, name) => { await triggerDownload(path, name); toast.success('다운로드됨'); }} onDelete={deleteSecureFile} />
-                ))}
-              </div>
+              <>
+                {!selectedSecurePhotoFolderId && securePhotoFolders.length > 0 && (
+                  <div className="mb-6">
+                    <h3 className="text-sm font-semibold text-gray-700 mb-2">폴더</h3>
+                    <div className="grid gap-3 min-w-0" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(20rem, 1fr))' }}>
+                      {securePhotoFolders.map((folder) => {
+                        const count = secureByType.photos.filter((p) => p.photo_folder_id === folder.id).length
+                        const isDropTarget = dragOverSecurePhotoFolderId === folder.id
+                        return (
+                          <div
+                            key={folder.id}
+                            className={`flex items-center gap-3 p-4 rounded-2xl border-2 transition-all group min-w-0 w-full overflow-hidden ${isDropTarget ? 'border-brand-400 bg-brand-50 shadow-md' : 'border-gray-100 bg-white hover:shadow-md'}`}
+                            onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; setDragOverSecurePhotoFolderId(folder.id) }}
+                            onDragLeave={() => setDragOverSecurePhotoFolderId(null)}
+                            onDrop={(e) => {
+                              e.preventDefault()
+                              e.stopPropagation()
+                              const photoId = e.dataTransfer.getData('application/x-secure-photo-id') || e.dataTransfer.getData('text/plain')
+                              if (photoId) moveSecurePhotoToFolder(photoId, folder.id)
+                              setDragOverSecurePhotoFolderId(null)
+                              setDraggedSecurePhotoId(null)
+                            }}
+                          >
+                            <button
+                              type="button"
+                              onClick={() => setSelectedSecurePhotoFolderId(folder.id)}
+                              onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); e.dataTransfer.dropEffect = 'move'; setDragOverSecurePhotoFolderId(folder.id) }}
+                              onDrop={(e) => {
+                                e.preventDefault()
+                                e.stopPropagation()
+                                const photoId = e.dataTransfer.getData('application/x-secure-photo-id') || e.dataTransfer.getData('text/plain')
+                                if (photoId) moveSecurePhotoToFolder(photoId, folder.id)
+                                setDragOverSecurePhotoFolderId(null)
+                                setDraggedSecurePhotoId(null)
+                              }}
+                              className="flex-1 flex items-center gap-3 text-left min-w-0"
+                            >
+                              <div className="w-12 h-12 rounded-xl bg-amber-50 flex items-center justify-center flex-shrink-0">
+                                <FolderOpen className="w-6 h-6 text-amber-600" />
+                              </div>
+                              <div className="min-w-0 flex-1">
+                                {editingPhotoFolderId === folder.id ? (
+                                  <div className="flex gap-1" onClick={(e) => e.stopPropagation()}>
+                                    <input
+                                      type="text"
+                                      value={editingPhotoFolderName}
+                                      onChange={(e) => setEditingPhotoFolderName(e.target.value)}
+                                      onKeyDown={(e) => {
+                                        if (e.key === 'Enter') {
+                                          renameSecurePhotoFolder(folder.id, editingPhotoFolderName.trim())
+                                        }
+                                        if (e.key === 'Escape') setEditingPhotoFolderId(null)
+                                      }}
+                                      className="flex-1 px-2 py-0.5 border border-gray-200 rounded text-sm min-w-0"
+                                      autoFocus
+                                    />
+                                    <button
+                                      type="button"
+                                      onClick={() => { renameSecurePhotoFolder(folder.id, editingPhotoFolderName.trim()) }}
+                                      className="text-xs text-brand-600 font-medium"
+                                    >
+                                      저장
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => setEditingPhotoFolderId(null)}
+                                      className="text-xs text-gray-500"
+                                    >
+                                      취소
+                                    </button>
+                                  </div>
+                                ) : (
+                                  <>
+                                    <p className="font-medium text-gray-800 whitespace-nowrap truncate" title={folder.name}>
+                                      {folder.name}
+                                    </p>
+                                    <p className="text-xs text-gray-400 whitespace-nowrap">{count}장</p>
+                                  </>
+                                )}
+                              </div>
+                            </button>
+                            {editingPhotoFolderId !== folder.id && (
+                              <button
+                                onClick={(e) => { e.stopPropagation(); setEditingPhotoFolderId(folder.id); setEditingPhotoFolderName(folder.name) }}
+                                className="p-2 rounded-lg text-gray-400 hover:text-brand-600 hover:bg-brand-50 opacity-0 group-hover:opacity-100"
+                                title="이름 변경"
+                              >
+                                <Pencil className="w-4 h-4" />
+                              </button>
+                            )}
+                            <button
+                              onClick={(e) => { e.stopPropagation(); deleteSecurePhotoFolder(folder.id) }}
+                              className="p-2 rounded-lg text-gray-400 hover:text-red-500 hover:bg-red-50 opacity-0 group-hover:opacity-100"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {!selectedSecurePhotoFolderId && secureRootPhotos.length > 0 && (
+                  <p className="text-xs text-gray-400 mb-3">폴더에 안 넣은 사진 · 드래그해서 폴더에 넣거나, 카드에 마우스를 올려 이동할 수 있어요</p>
+                )}
+
+                {displaySecurePhotos.length === 0 ? (
+                  <div className="bg-white rounded-2xl border border-dashed border-gray-200 p-16 text-center">
+                    <div className="w-12 h-12 bg-blue-50 rounded-2xl flex items-center justify-center mx-auto mb-3">
+                      <Upload className="w-5 h-5 text-brand-600" />
+                    </div>
+                    <p className="text-sm text-gray-500">
+                      {selectedSecurePhotoFolderId ? '이 폴더에 사진이 없어요' : '사진을 업로드해보세요'}
+                    </p>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+                    {displaySecurePhotos.map((f) => (
+                      <SecurePhotoCard
+                        key={f.id}
+                        f={f}
+                        photoFolders={securePhotoFolders}
+                        onSelect={(file) => setSelectedSecurePhoto(file)}
+                        onDownload={async (path, name) => { await triggerDownload(path, name); toast.success('다운로드됨'); }}
+                        onDelete={deleteSecureFile}
+                        onMoveToFolder={moveSecurePhotoToFolder}
+                        isDragging={draggedSecurePhotoId === f.id}
+                        onDragStart={() => setDraggedSecurePhotoId(f.id)}
+                        onDragEnd={() => { setDraggedSecurePhotoId(null); setDragOverSecurePhotoFolderId(null) }}
+                      />
+                    ))}
+                  </div>
+                )}
+              </>
             )}
           </>
         )}

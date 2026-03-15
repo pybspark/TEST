@@ -99,6 +99,7 @@ export default function FamilyPage() {
       .from('files')
       .select('id, name, file_type, created_at')
       .eq('is_shared', true)
+      .eq('is_deleted', false)
       .or(`group_id.eq.${currentId},group_id.is.null`)
       .limit(10)
     const { data: sNotes } = await supabase

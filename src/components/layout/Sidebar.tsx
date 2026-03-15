@@ -1,7 +1,7 @@
 'use client'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { Cloud, Image, FileText, Video, StickyNote, Users, LogOut, HardDrive, Share2, Crown, Menu, X, Lock } from 'lucide-react'
+import { Cloud, Image, FileText, Video, StickyNote, Users, LogOut, HardDrive, Share2, Crown, Menu, X, Lock, Trash2 } from 'lucide-react'
 import { createClient } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
 import { useState } from 'react'
@@ -13,6 +13,7 @@ const baseNavItems = [
   { href: '/dashboard/secure', label: '보안 폴더', icon: Lock },
   { href: '/dashboard/photos', label: '사진', icon: Image },
   { href: '/dashboard/files', label: '파일', icon: FileText },
+  { href: '/dashboard/trash', label: '휴지통', icon: Trash2 },
   { href: '/dashboard/videos', label: '영상', icon: Video },
   { href: '/dashboard/notes', label: '메모', icon: StickyNote },
   { href: '/dashboard/shared', label: '공유됨', icon: Share2 },

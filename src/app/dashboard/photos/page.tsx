@@ -57,6 +57,7 @@ export default function PhotosPage() {
       .eq('owner_id', user.id)
       .eq('file_type', 'photo')
       .or('is_secure.eq.false,is_secure.is.null')
+      .eq('is_deleted', false)
       .order('created_at', { ascending: false })
     if (error && (error.message?.includes('photo_folder_id') || error.message?.includes('column'))) {
       const { data: dataWithoutFolder } = await supabase
@@ -65,6 +66,7 @@ export default function PhotosPage() {
         .eq('owner_id', user.id)
         .eq('file_type', 'photo')
         .or('is_secure.eq.false,is_secure.is.null')
+        .eq('is_deleted', false)
         .order('created_at', { ascending: false })
       setPhotos(
         (dataWithoutFolder || []).map((f: Record<string, unknown>): FileRecord => ({
@@ -165,9 +167,21 @@ export default function PhotosPage() {
   }
 
   async function deletePhoto(id: string, path: string) {
-    await supabase.storage.from('family-files').remove([path])
-    await supabase.from('files').delete().eq('id', id)
-    toast.success('삭제되었습니다')
+    const now = new Date().toISOString()
+    const { error } = await supabase.from('files').update({ is_deleted: true, deleted_at: now }).eq('id', id)
+    if (error) {
+      if (error.message?.includes('column') || error.message?.includes('is_deleted') || error.message?.includes('deleted_at')) {
+        await supabase.storage.from('family-files').remove([path])
+        const { error: delErr } = await supabase.from('files').delete().eq('id', id)
+        if (delErr) return toast.error('삭제에 실패했어요')
+        toast.success('삭제되었습니다')
+        setSelected(null)
+        fetchPhotos()
+        return
+      }
+      return toast.error('삭제에 실패했어요')
+    }
+    toast.success('휴지통으로 이동했어요')
     setSelected(null)
     fetchPhotos()
   }

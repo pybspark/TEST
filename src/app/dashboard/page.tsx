@@ -11,6 +11,7 @@ export default async function DashboardPage() {
   const { data: recentFiles } = await supabase
     .from('files').select('*')
     .eq('owner_id', user!.id)
+    .eq('is_deleted', false)
     .order('created_at', { ascending: false })
     .limit(12)
 

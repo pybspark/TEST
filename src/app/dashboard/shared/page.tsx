@@ -47,6 +47,7 @@ export default function SharedPage() {
         .from('files')
         .select('id, name, storage_path, file_type, created_at, group_id, profiles(name)')
         .eq('is_shared', true)
+        .eq('is_deleted', false)
         .in('group_id', groupIds)
         .order('created_at', { ascending: false })
       const { data: notes } = await supabase

@@ -18,6 +18,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
     .from('files')
     .select('size_bytes')
     .eq('owner_id', user.id)
+    .eq('is_deleted', false)
 
   const usedBytes = files?.reduce((sum, f) => sum + (f.size_bytes || 0), 0) || 0
 

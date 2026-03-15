@@ -1,0 +1,5 @@
+-- 파일 휴지통 기능: 소프트 삭제용 플래그
+ALTER TABLE files
+  ADD COLUMN IF NOT EXISTS is_deleted BOOLEAN NOT NULL DEFAULT FALSE,
+  ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ;
+

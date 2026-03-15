@@ -96,7 +96,7 @@ export default function UploadZone({
         is_secure: isSecure,
       }
       if (isSecure && folderId) insertPayload.folder_id = folderId
-      if (!isSecure && fileType === 'photo' && photoFolderId) insertPayload.photo_folder_id = photoFolderId
+      if (fileType === 'photo' && photoFolderId) insertPayload.photo_folder_id = photoFolderId
       if (!isSecure && fileType === 'file' && fileFolderId) insertPayload.file_folder_id = fileFolderId
 
       const { error: insertError } = await supabase.from('files').insert(insertPayload)

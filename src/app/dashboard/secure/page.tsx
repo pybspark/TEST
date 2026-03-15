@@ -216,6 +216,27 @@ function SecureVideoModal({ file, onClose, onDownload, onDelete, onRename }: { f
   )
 }
 
+/** Word/Excel 등 변환 미리보기 지원 형식 */
+function isOfficePreviewType(mime: string): boolean {
+  if (!mime) return false
+  const lower = mime.toLowerCase()
+  return (
+    lower.includes('word') ||
+    lower.includes('document') ||
+    lower.includes('sheet') ||
+    lower.includes('excel') ||
+    lower.includes('powerpoint') ||
+    lower.includes('presentation') ||
+    lower === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' ||
+    lower === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' ||
+    lower === 'application/vnd.openxmlformats-officedocument.presentationml.presentation' ||
+    lower.includes('msword') ||
+    lower.includes('ms-excel') ||
+    lower.includes('ms-powerpoint') ||
+    lower.includes('opendocument')
+  )
+}
+
 /** 보안 폴더 문서/일반 파일 모달: 뷰어 + 파일명 + 메모 + 타임라인 */
 function SecureFileModal({
   file,
@@ -237,31 +258,87 @@ function SecureFileModal({
   const [editValue, setEditValue] = useState(file.name)
   const [memoValue, setMemoValue] = useState(file.memo ?? '')
   const [memoSaving, setMemoSaving] = useState(false)
+  const [previewPdfUrl, setPreviewPdfUrl] = useState<string | null>(null)
+  const [previewLoading, setPreviewLoading] = useState(false)
+  const [previewError, setPreviewError] = useState<'none' | 'unavailable' | 'failed'>('none')
+
   useEffect(() => { setEditValue(file.name) }, [file.name])
   useEffect(() => { setMemoValue(file.memo ?? '') }, [file.memo])
+
+  const isPdf = file.mime_type === 'application/pdf'
+  const isOffice = isOfficePreviewType(file.mime_type)
+
+  useEffect(() => {
+    if (!isOffice || !file.storage_path) {
+      setPreviewPdfUrl(null)
+      setPreviewError('none')
+      return
+    }
+    let cancelled = false
+    setPreviewLoading(true)
+    setPreviewError('none')
+    setPreviewPdfUrl(null)
+    fetch('/api/preview-document', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ storagePath: file.storage_path }),
+    })
+      .then((r) => r.json().then((d) => ({ ok: r.ok, status: r.status, data: d })))
+      .then(({ ok, status, data }) => {
+        if (cancelled) return
+        setPreviewLoading(false)
+        if (ok && data?.url) {
+          setPreviewPdfUrl(data.url)
+          setPreviewError('none')
+        } else if (status === 503 && data?.error === 'CONVERSION_UNAVAILABLE') {
+          setPreviewError('unavailable')
+        } else {
+          setPreviewError('failed')
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setPreviewLoading(false)
+          setPreviewError('failed')
+        }
+      })
+    return () => { cancelled = true }
+  }, [file.storage_path, isOffice])
+
   const saveRename = () => {
     const trimmed = editValue.trim()
     if (trimmed && trimmed !== file.name) onRename(file.id, trimmed)
     setEditingName(false)
   }
-  const isPdf = file.mime_type === 'application/pdf'
   const handleSaveMemo = async () => {
     setMemoSaving(true)
     await onSaveMemo(file.id, memoValue)
     setMemoSaving(false)
   }
+
+  const showPdfInIframe = isPdf && url
+  const showOfficePdfInIframe = isOffice && previewPdfUrl && !previewLoading
+  const showFallback = !showPdfInIframe && !showOfficePdfInIframe && (url || isOffice)
+
   return (
     <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4" onClick={onClose}>
       <div className="bg-white rounded-2xl overflow-hidden max-w-3xl w-full max-h-[90vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
         <div className="flex-1 min-h-[200px] flex flex-col bg-gray-50 overflow-hidden">
-          {loading ? (
+          {loading && !isOffice ? (
             <div className="w-full flex-1 min-h-[40vh] bg-gray-100 animate-pulse" />
-          ) : isPdf && url ? (
-            <iframe src={url} title={file.name} className="w-full flex-1 min-h-[50vh] border-0 bg-white" />
-          ) : url ? (
+          ) : (showPdfInIframe || showOfficePdfInIframe) ? (
+            <iframe src={showPdfInIframe ? url! : previewPdfUrl!} title={file.name} className="w-full flex-1 min-h-[50vh] border-0 bg-white" />
+          ) : previewLoading && isOffice ? (
+            <div className="flex-1 min-h-[40vh] flex flex-col items-center justify-center gap-3 bg-gray-100">
+              <div className="w-8 h-8 border-2 border-brand-500 border-t-transparent rounded-full animate-spin" />
+              <p className="text-sm text-gray-500">미리보기 준비 중…</p>
+            </div>
+          ) : showFallback ? (
             <div className="flex-1 min-h-[40vh] flex flex-col items-center justify-center gap-4 p-6">
               <DocumentThumbnail bucket="family-files" storagePath={file.storage_path} mimeType={file.mime_type} fallback={<FileText className="w-16 h-16 text-gray-400" />} className="max-w-full max-h-[45vh] w-auto h-auto" />
-              <button type="button" onClick={() => window.open(url, '_blank')} className="px-4 py-2 bg-brand-600 text-white rounded-xl text-sm font-medium hover:bg-brand-700">
+              {previewError === 'unavailable' && <p className="text-xs text-gray-500 text-center">문서 미리보기는 서버 설정 후 이용할 수 있어요</p>}
+              {previewError === 'failed' && <p className="text-xs text-amber-600 text-center">미리보기를 불러오지 못했어요</p>}
+              <button type="button" onClick={() => url && window.open(url, '_blank')} className="px-4 py-2 bg-brand-600 text-white rounded-xl text-sm font-medium hover:bg-brand-700">
                 새 탭에서 열기
               </button>
             </div>

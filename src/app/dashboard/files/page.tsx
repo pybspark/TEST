@@ -2,7 +2,7 @@
 import { useState, useEffect } from 'react'
 import { createClient, getFileUrl, formatFileSize } from '@/lib/supabase'
 import UploadZone from '@/components/features/UploadZone'
-import { Upload, FileText, Trash2, Download, Share2, Search } from 'lucide-react'
+import { Upload, FileText, Trash2, Download, Share2, Search, Pencil } from 'lucide-react'
 import { useMyGroups } from '@/hooks/useMyGroups'
 import ShareGroupDropdown from '@/components/ui/ShareGroupDropdown'
 import { formatDistanceToNow } from 'date-fns'
@@ -41,6 +41,8 @@ export default function FilesPage() {
   const [loading, setLoading] = useState(true)
   const [showUpload, setShowUpload] = useState(false)
   const [query, setQuery] = useState('')
+  const [editingFileId, setEditingFileId] = useState<string | null>(null)
+  const [editingFileName, setEditingFileName] = useState('')
   const supabase = createClient()
   const { groups } = useMyGroups()
 
@@ -70,6 +72,14 @@ export default function FilesPage() {
   async function setShareGroup(id: string, groupId: string | null) {
     await supabase.from('files').update({ is_shared: !!groupId, group_id: groupId }).eq('id', id)
     toast.success(groupId ? '해당 그룹에 공유됨' : '공유 해제됨')
+    fetchFiles()
+  }
+
+  async function renameFile(id: string, newName: string) {
+    const { error } = await supabase.from('files').update({ name: newName }).eq('id', id)
+    if (error) return toast.error('이름 변경 실패')
+    toast.success('이름이 변경되었습니다')
+    setEditingFileId(null)
     fetchFiles()
   }
 
@@ -145,7 +155,15 @@ export default function FilesPage() {
                   {getFileIcon(file.mime_type)}
                 </div>
                 <div className="min-w-0">
-                  <p className="text-sm text-gray-800 truncate">{file.name}</p>
+                  {editingFileId === file.id ? (
+                    <div className="flex gap-1 items-center">
+                      <input type="text" value={editingFileName} onChange={(e) => setEditingFileName(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') renameFile(file.id, editingFileName.trim()); if (e.key === 'Escape') setEditingFileId(null) }} className="flex-1 px-2 py-0.5 border border-gray-200 rounded text-sm min-w-0" autoFocus />
+                      <button type="button" onClick={() => renameFile(file.id, editingFileName.trim())} className="text-xs text-brand-600 font-medium shrink-0">저장</button>
+                      <button type="button" onClick={() => setEditingFileId(null)} className="text-xs text-gray-500 shrink-0">취소</button>
+                    </div>
+                  ) : (
+                    <p className="text-sm text-gray-800 truncate">{file.name}</p>
+                  )}
                   <p className={`text-xs flex items-center gap-1 mt-0.5 ${file.is_shared ? 'text-brand-600' : 'text-gray-400'}`}>
                     <Share2 className="w-3 h-3 flex-shrink-0" />
                     {file.is_shared && file.group_id
@@ -159,6 +177,11 @@ export default function FilesPage() {
                 {formatDistanceToNow(new Date(file.created_at), { addSuffix: true, locale: ko })}
               </span>
               <div className="flex items-center justify-end gap-1">
+                {editingFileId !== file.id && (
+                  <button onClick={() => { setEditingFileId(file.id); setEditingFileName(file.name) }} className="p-1.5 rounded-lg text-gray-400 hover:text-brand-600 hover:bg-brand-50 transition-colors" title="이름 변경">
+                    <Pencil className="w-3.5 h-3.5" />
+                  </button>
+                )}
                 <ShareGroupDropdown
                   isShared={file.is_shared}
                   sharedGroupId={file.group_id}

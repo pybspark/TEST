@@ -2,7 +2,7 @@
 import { useState, useEffect } from 'react'
 import { createClient, getFileUrl, formatFileSize } from '@/lib/supabase'
 import UploadZone from '@/components/features/UploadZone'
-import { Upload, Video, Play, X, Trash2, Share2 } from 'lucide-react'
+import { Upload, Video, Play, X, Trash2, Share2, Pencil } from 'lucide-react'
 import { useMyGroups } from '@/hooks/useMyGroups'
 import ShareGroupDropdown from '@/components/ui/ShareGroupDropdown'
 import { formatDistanceToNow } from 'date-fns'
@@ -25,6 +25,8 @@ export default function VideosPage() {
   const [loading, setLoading] = useState(true)
   const [showUpload, setShowUpload] = useState(false)
   const [playing, setPlaying] = useState<string | null>(null)
+  const [editingName, setEditingName] = useState(false)
+  const [editNameValue, setEditNameValue] = useState('')
   const supabase = createClient()
   const { groups } = useMyGroups()
 
@@ -55,6 +57,14 @@ export default function VideosPage() {
   async function setShareGroup(id: string, groupId: string | null) {
     await supabase.from('files').update({ is_shared: !!groupId, group_id: groupId }).eq('id', id)
     toast.success(groupId ? '해당 그룹에 공유됨' : '공유 해제됨')
+    fetchVideos()
+  }
+
+  async function renameVideo(id: string, newName: string) {
+    const { error } = await supabase.from('files').update({ name: newName }).eq('id', id)
+    if (error) return toast.error('이름 변경 실패')
+    toast.success('이름이 변경되었습니다')
+    setEditingName(false)
     fetchVideos()
   }
 
@@ -156,8 +166,19 @@ export default function VideosPage() {
                   <span className="text-gray-500">공유 안 함</span>
                 )}
               </p>
-              <div className="flex items-center justify-between">
-                <p className="text-sm font-medium text-white truncate flex-1">{playingVideo.name}</p>
+              <div className="flex items-center justify-between flex-wrap gap-2">
+                {editingName ? (
+                  <div className="flex gap-1 flex-1 min-w-0">
+                    <input type="text" value={editNameValue} onChange={(e) => setEditNameValue(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && renameVideo(playingVideo.id, editNameValue.trim())} className="flex-1 px-3 py-1.5 border border-gray-600 bg-gray-800 text-white rounded-lg text-sm min-w-0" autoFocus />
+                    <button type="button" onClick={() => renameVideo(playingVideo.id, editNameValue.trim())} className="px-3 py-1.5 bg-brand-600 text-white rounded-lg text-sm shrink-0">저장</button>
+                    <button type="button" onClick={() => { setEditingName(false); setEditNameValue(playingVideo.name) }} className="px-3 py-1.5 text-gray-400 rounded-lg text-sm shrink-0">취소</button>
+                  </div>
+                ) : (
+                  <>
+                    <p className="text-sm font-medium text-white truncate flex-1 min-w-0">{playingVideo.name}</p>
+                    <button type="button" onClick={() => { setEditNameValue(playingVideo.name); setEditingName(true) }} className="p-1.5 rounded-lg text-gray-400 hover:bg-gray-700" title="이름 변경"><Pencil className="w-4 h-4" /></button>
+                  </>
+                )}
                 <div className="flex gap-2 ml-4">
                 <ShareGroupDropdown
                   isShared={playingVideo.is_shared}

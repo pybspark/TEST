@@ -2,7 +2,7 @@
 import { useState, useEffect } from 'react'
 import { createClient, getFileUrl } from '@/lib/supabase'
 import UploadZone from '@/components/features/UploadZone'
-import { Upload, X, Download, Trash2, Share2, ZoomIn } from 'lucide-react'
+import { Upload, X, Download, Trash2, Share2, ZoomIn, Pencil } from 'lucide-react'
 import { useMyGroups } from '@/hooks/useMyGroups'
 import ShareGroupDropdown from '@/components/ui/ShareGroupDropdown'
 import Image from 'next/image'
@@ -24,6 +24,8 @@ export default function PhotosPage() {
   const [loading, setLoading] = useState(true)
   const [showUpload, setShowUpload] = useState(false)
   const [selected, setSelected] = useState<string | null>(null)
+  const [editingName, setEditingName] = useState(false)
+  const [editNameValue, setEditNameValue] = useState('')
   const supabase = createClient()
   const { groups } = useMyGroups()
 
@@ -54,6 +56,14 @@ export default function PhotosPage() {
   async function setShareGroup(id: string, groupId: string | null) {
     await supabase.from('files').update({ is_shared: !!groupId, group_id: groupId }).eq('id', id)
     toast.success(groupId ? '해당 그룹에 공유됨' : '공유 해제됨')
+    fetchPhotos()
+  }
+
+  async function renamePhoto(id: string, newName: string) {
+    const { error } = await supabase.from('files').update({ name: newName }).eq('id', id)
+    if (error) return toast.error('이름 변경 실패')
+    toast.success('이름이 변경되었습니다')
+    setEditingName(false)
     fetchPhotos()
   }
 
@@ -156,6 +166,20 @@ export default function PhotosPage() {
                   <span className="text-gray-400">공유 안 함</span>
                 )}
               </p>
+              <div className="flex items-center gap-2 mb-3">
+                {editingName ? (
+                  <>
+                    <input type="text" value={editNameValue} onChange={(e) => setEditNameValue(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && renamePhoto(selectedPhoto.id, editNameValue.trim())} className="flex-1 px-3 py-1.5 border border-gray-200 rounded-lg text-sm" autoFocus />
+                    <button type="button" onClick={() => renamePhoto(selectedPhoto.id, editNameValue.trim())} className="px-3 py-1.5 bg-brand-600 text-white rounded-lg text-sm">저장</button>
+                    <button type="button" onClick={() => { setEditingName(false); setEditNameValue(selectedPhoto.name) }} className="px-3 py-1.5 text-gray-500 rounded-lg text-sm">취소</button>
+                  </>
+                ) : (
+                  <>
+                    <p className="text-sm font-medium text-gray-800 truncate flex-1">{selectedPhoto.name}</p>
+                    <button type="button" onClick={() => { setEditNameValue(selectedPhoto.name); setEditingName(true) }} className="p-1.5 rounded-lg text-gray-400 hover:bg-gray-100" title="이름 변경"><Pencil className="w-4 h-4" /></button>
+                  </>
+                )}
+              </div>
               <div className="flex gap-2">
                 <div className="flex-1 flex items-center justify-center relative">
                   <ShareGroupDropdown

@@ -1,9 +1,11 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import { Lock, LockOpen, Shield, FolderLock, Upload, FileText, StickyNote, Trash2, Download, Plus, Pin, X, Save, Image, Video, FolderPlus, FolderOpen, ChevronRight } from 'lucide-react'
-import { createClient, getFileUrl, formatFileSize } from '@/lib/supabase'
+import { Lock, LockOpen, Shield, FolderLock, Upload, FileText, StickyNote, Trash2, Download, Plus, Pin, X, Save, Image, Video, FolderPlus, FolderOpen, ChevronRight, Pencil } from 'lucide-react'
+import { createClient, getSignedFileUrl, formatFileSize } from '@/lib/supabase'
+import { useSignedFileUrl } from '@/hooks/useSignedFileUrl'
 import UploadZone from '@/components/features/UploadZone'
+import DocumentThumbnail from '@/components/features/DocumentThumbnail'
 import { formatDistanceToNow } from 'date-fns'
 import { ko } from 'date-fns/locale'
 import { toast } from 'sonner'
@@ -26,6 +28,8 @@ interface SecureFile {
   created_at: string
   file_type?: string
   folder_id?: string | null
+  memo?: string | null
+  memo_updated_at?: string | null
 }
 
 interface SecureFolder {
@@ -41,6 +45,273 @@ interface SecureNote {
   color: string
   pinned: boolean
   updated_at: string
+}
+
+/** 서명 URL로 파일 받아서 브라우저 다운로드만 트리거 (새 탭 안 열림) */
+async function triggerDownload(path: string, fileName: string) {
+  const url = await getSignedFileUrl('family-files', path, 60)
+  if (!url) return
+  try {
+    const res = await fetch(url)
+    const blob = await res.blob()
+    const objectUrl = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = objectUrl
+    a.download = fileName
+    a.click()
+    URL.revokeObjectURL(objectUrl)
+  } catch {
+    // ignore
+  }
+}
+
+/** 보안 폴더용: 카드 클릭 시 확대 모달, 다운로드는 항상 파일로 저장 */
+function SecurePhotoCard({ f, onSelect, onDownload, onDelete }: { f: SecureFile; onSelect: (f: SecureFile) => void; onDownload: (path: string, name: string) => void; onDelete: (id: string, path: string) => void }) {
+  const { url, loading } = useSignedFileUrl('family-files', f.storage_path, 300)
+  return (
+    <div
+      className="bg-white rounded-2xl border border-gray-100 overflow-hidden hover:shadow-md transition-shadow flex flex-col cursor-pointer"
+      onClick={() => onSelect(f)}
+    >
+      <div className="aspect-square min-h-[140px] bg-gray-50 flex items-center justify-center relative group">
+        {loading ? <div className="w-full h-full bg-gray-100 animate-pulse" /> : url ? <img src={url} alt="" className="w-full h-full object-cover transition-transform group-hover:scale-105" /> : <div className="w-full h-full bg-gray-100 flex items-center justify-center text-gray-400 text-sm">로드 실패</div>}
+        <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors flex items-end justify-end gap-1 p-3 opacity-0 group-hover:opacity-100 pointer-events-none">
+          <span className="pointer-events-auto flex gap-1">
+            <button type="button" onClick={(e) => { e.stopPropagation(); onDownload(f.storage_path, f.name) }} className="p-2 rounded-lg bg-white/90 text-gray-700 hover:bg-white shadow"><Download className="w-4 h-4" /></button>
+            <button type="button" onClick={(e) => { e.stopPropagation(); onDelete(f.id, f.storage_path) }} className="p-2 rounded-lg bg-white/90 text-red-500 hover:bg-white shadow"><Trash2 className="w-4 h-4" /></button>
+          </span>
+        </div>
+      </div>
+      <div className="px-4 py-3 min-w-0 border-t border-gray-50">
+        <p className="text-sm text-gray-700 truncate font-normal tracking-tight" title={f.name}>{f.name}</p>
+        <p className="text-xs text-gray-400 mt-1">{formatFileSize(f.size_bytes)} · {formatDistanceToNow(new Date(f.created_at), { addSuffix: true, locale: ko })}</p>
+      </div>
+    </div>
+  )
+}
+
+/** 보안 폴더용: 카드 클릭 시 확대 모달, 다운로드는 항상 파일로 저장 */
+function SecureVideoCard({ f, onSelect, onDownload, onDelete }: { f: SecureFile; onSelect: (f: SecureFile) => void; onDownload: (path: string, name: string) => void; onDelete: (id: string, path: string) => void }) {
+  const { url, loading } = useSignedFileUrl('family-files', f.storage_path, 300)
+  return (
+    <div
+      className="bg-white rounded-2xl border border-gray-100 overflow-hidden hover:shadow-md transition-shadow flex flex-col cursor-pointer"
+      onClick={() => onSelect(f)}
+    >
+      <div className="aspect-video min-h-[120px] bg-gray-900 flex items-center justify-center relative group">
+        {loading ? <div className="w-full h-full bg-gray-800 animate-pulse" /> : url ? <video src={url} preload="metadata" className="w-full h-full object-cover" muted playsInline /> : <div className="w-full h-full bg-gray-800 flex items-center justify-center text-gray-400 text-sm">로드 실패</div>}
+        <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors flex items-end justify-end gap-1 p-3 opacity-0 group-hover:opacity-100 pointer-events-none">
+          <span className="pointer-events-auto flex gap-1">
+            <button type="button" onClick={(e) => { e.stopPropagation(); onDownload(f.storage_path, f.name) }} className="p-2 rounded-lg bg-white/90 text-gray-700 hover:bg-white shadow"><Download className="w-4 h-4" /></button>
+            <button type="button" onClick={(e) => { e.stopPropagation(); onDelete(f.id, f.storage_path) }} className="p-2 rounded-lg bg-white/90 text-red-500 hover:bg-white shadow"><Trash2 className="w-4 h-4" /></button>
+          </span>
+        </div>
+      </div>
+      <div className="px-4 py-3 min-w-0 border-t border-gray-50">
+        <p className="text-sm text-gray-700 truncate font-normal tracking-tight" title={f.name}>{f.name}</p>
+        <p className="text-xs text-gray-400 mt-1">{formatFileSize(f.size_bytes)} · {formatDistanceToNow(new Date(f.created_at), { addSuffix: true, locale: ko })}</p>
+      </div>
+    </div>
+  )
+}
+
+/** 보안 폴더용: 다운로드만 (항상 파일로 저장, 새 탭 안 열림) */
+function SecureDownloadLink({ path, fileName, className, children }: { path: string; fileName: string; className?: string; children: React.ReactNode }) {
+  return (
+    <button type="button" onClick={() => triggerDownload(path, fileName)} className={className}>
+      {children}
+    </button>
+  )
+}
+
+/** 보안 폴더 사진 확대 모달 */
+function SecurePhotoModal({ file, onClose, onDownload, onDelete, onRename }: { file: SecureFile; onClose: () => void; onDownload: (path: string, name: string) => void; onDelete: (id: string, path: string) => void; onRename: (id: string, name: string) => void }) {
+  const { url, loading } = useSignedFileUrl('family-files', file.storage_path, 300)
+  const [editingName, setEditingName] = useState(false)
+  const [editValue, setEditValue] = useState(file.name)
+  useEffect(() => { setEditValue(file.name) }, [file.name])
+  const saveRename = () => {
+    const trimmed = editValue.trim()
+    if (trimmed && trimmed !== file.name) onRename(file.id, trimmed)
+    setEditingName(false)
+  }
+  return (
+    <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4" onClick={onClose}>
+      <div className="bg-white rounded-2xl overflow-hidden max-w-2xl w-full max-h-[90vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
+        <div className="relative flex-1 min-h-[40vh] flex items-center justify-center bg-gray-50 overflow-hidden">
+          {loading ? <div className="w-full h-64 bg-gray-100 animate-pulse" /> : url ? <img src={url} alt="" className="max-w-full max-h-[70vh] w-auto h-auto object-contain" /> : <div className="text-gray-400 py-12">로드 실패</div>}
+        </div>
+        <div className="p-4 border-t border-gray-100 flex gap-2 flex-wrap">
+          <div className="w-full flex items-center gap-2">
+            {editingName ? (
+              <>
+                <input type="text" value={editValue} onChange={(e) => setEditValue(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && saveRename()} className="flex-1 px-3 py-1.5 border border-gray-200 rounded-lg text-sm" autoFocus />
+                <button type="button" onClick={saveRename} className="px-3 py-1.5 bg-brand-600 text-white rounded-lg text-sm">저장</button>
+                <button type="button" onClick={() => { setEditingName(false); setEditValue(file.name) }} className="px-3 py-1.5 text-gray-500 rounded-lg text-sm">취소</button>
+              </>
+            ) : (
+              <>
+                <p className="text-sm font-medium text-gray-800 truncate flex-1">{file.name}</p>
+                <button type="button" onClick={() => { setEditValue(file.name); setEditingName(true) }} className="p-1.5 rounded-lg text-gray-400 hover:bg-gray-100" title="이름 변경"><Pencil className="w-4 h-4" /></button>
+              </>
+            )}
+          </div>
+          <button type="button" onClick={() => onDownload(file.storage_path, file.name)} className="flex-1 flex items-center justify-center gap-2 py-2 bg-gray-100 text-gray-700 rounded-xl text-sm font-medium hover:bg-gray-200">
+            <Download className="w-4 h-4" /> 다운로드
+          </button>
+          <button onClick={() => onDelete(file.id, file.storage_path)} className="flex items-center justify-center gap-2 px-4 py-2 bg-red-50 text-red-500 rounded-xl text-sm font-medium hover:bg-red-100">
+            <Trash2 className="w-4 h-4" />
+          </button>
+          <button onClick={onClose} className="flex items-center justify-center p-2 bg-gray-100 text-gray-600 rounded-xl hover:bg-gray-200">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+/** 보안 폴더 동영상 확대 모달 */
+function SecureVideoModal({ file, onClose, onDownload, onDelete, onRename }: { file: SecureFile; onClose: () => void; onDownload: (path: string, name: string) => void; onDelete: (id: string, path: string) => void; onRename: (id: string, name: string) => void }) {
+  const { url, loading } = useSignedFileUrl('family-files', file.storage_path, 300)
+  const [editingName, setEditingName] = useState(false)
+  const [editValue, setEditValue] = useState(file.name)
+  useEffect(() => { setEditValue(file.name) }, [file.name])
+  const saveRename = () => {
+    const trimmed = editValue.trim()
+    if (trimmed && trimmed !== file.name) onRename(file.id, trimmed)
+    setEditingName(false)
+  }
+  return (
+    <div className="fixed inset-0 bg-black/90 z-50 flex items-center justify-center p-4" onClick={onClose}>
+      <div className="bg-black rounded-2xl overflow-hidden max-w-3xl w-full" onClick={(e) => e.stopPropagation()}>
+        {loading ? <div className="w-full aspect-video bg-gray-800 animate-pulse" /> : url ? <video src={url} controls autoPlay className="w-full max-h-[70vh]" /> : <div className="aspect-video flex items-center justify-center text-gray-400">로드 실패</div>}
+        <div className="p-4 flex items-center gap-2 flex-wrap">
+          <div className="flex-1 min-w-0 flex items-center gap-2">
+            {editingName ? (
+              <>
+                <input type="text" value={editValue} onChange={(e) => setEditValue(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && saveRename()} className="flex-1 px-3 py-1.5 border border-gray-600 bg-gray-800 text-white rounded-lg text-sm" autoFocus />
+                <button type="button" onClick={saveRename} className="px-3 py-1.5 bg-brand-600 text-white rounded-lg text-sm">저장</button>
+                <button type="button" onClick={() => { setEditingName(false); setEditValue(file.name) }} className="px-3 py-1.5 text-gray-400 rounded-lg text-sm">취소</button>
+              </>
+            ) : (
+              <>
+                <p className="text-sm font-medium text-white truncate flex-1">{file.name}</p>
+                <button type="button" onClick={() => { setEditValue(file.name); setEditingName(true) }} className="p-1.5 rounded-lg text-gray-400 hover:bg-gray-700" title="이름 변경"><Pencil className="w-4 h-4" /></button>
+              </>
+            )}
+          </div>
+          <button type="button" onClick={() => onDownload(file.storage_path, file.name)} className="flex items-center justify-center gap-2 px-4 py-2 bg-gray-700 text-white rounded-xl text-sm hover:bg-gray-600">
+            <Download className="w-4 h-4" /> 다운로드
+          </button>
+          <button onClick={() => onDelete(file.id, file.storage_path)} className="flex items-center justify-center gap-2 px-4 py-2 bg-red-900/50 text-red-400 rounded-xl text-sm hover:bg-red-900">
+            <Trash2 className="w-4 h-4" />
+          </button>
+          <button onClick={onClose} className="p-2 bg-gray-700 text-gray-300 rounded-xl hover:bg-gray-600">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+/** 보안 폴더 문서/일반 파일 모달: 뷰어 + 파일명 + 메모 + 타임라인 */
+function SecureFileModal({
+  file,
+  onClose,
+  onDownload,
+  onDelete,
+  onRename,
+  onSaveMemo,
+}: {
+  file: SecureFile
+  onClose: () => void
+  onDownload: (path: string, name: string) => void
+  onDelete: (id: string, path: string) => void
+  onRename: (id: string, name: string) => void
+  onSaveMemo: (fileId: string, memo: string) => void
+}) {
+  const { url, loading } = useSignedFileUrl('family-files', file.storage_path, 300)
+  const [editingName, setEditingName] = useState(false)
+  const [editValue, setEditValue] = useState(file.name)
+  const [memoValue, setMemoValue] = useState(file.memo ?? '')
+  const [memoSaving, setMemoSaving] = useState(false)
+  useEffect(() => { setEditValue(file.name) }, [file.name])
+  useEffect(() => { setMemoValue(file.memo ?? '') }, [file.memo])
+  const saveRename = () => {
+    const trimmed = editValue.trim()
+    if (trimmed && trimmed !== file.name) onRename(file.id, trimmed)
+    setEditingName(false)
+  }
+  const isPdf = file.mime_type === 'application/pdf'
+  const handleSaveMemo = async () => {
+    setMemoSaving(true)
+    await onSaveMemo(file.id, memoValue)
+    setMemoSaving(false)
+  }
+  return (
+    <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4" onClick={onClose}>
+      <div className="bg-white rounded-2xl overflow-hidden max-w-3xl w-full max-h-[90vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
+        <div className="flex-1 min-h-[200px] flex flex-col bg-gray-50 overflow-hidden">
+          {loading ? (
+            <div className="w-full flex-1 min-h-[40vh] bg-gray-100 animate-pulse" />
+          ) : isPdf && url ? (
+            <iframe src={url} title={file.name} className="w-full flex-1 min-h-[50vh] border-0 bg-white" />
+          ) : url ? (
+            <div className="flex-1 min-h-[40vh] flex flex-col items-center justify-center gap-4 p-6">
+              <DocumentThumbnail bucket="family-files" storagePath={file.storage_path} mimeType={file.mime_type} fallback={<FileText className="w-16 h-16 text-gray-400" />} className="max-w-full max-h-[45vh] w-auto h-auto" />
+              <button type="button" onClick={() => window.open(url, '_blank')} className="px-4 py-2 bg-brand-600 text-white rounded-xl text-sm font-medium hover:bg-brand-700">
+                새 탭에서 열기
+              </button>
+            </div>
+          ) : (
+            <div className="flex-1 min-h-[40vh] flex items-center justify-center text-gray-400">로드 실패</div>
+          )}
+        </div>
+        <div className="p-4 border-t border-gray-100 space-y-4">
+          <div className="flex items-center gap-2 flex-wrap">
+            {editingName ? (
+              <>
+                <input type="text" value={editValue} onChange={(e) => setEditValue(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && saveRename()} className="flex-1 min-w-0 px-3 py-1.5 border border-gray-200 rounded-lg text-sm" autoFocus />
+                <button type="button" onClick={saveRename} className="px-3 py-1.5 bg-brand-600 text-white rounded-lg text-sm">저장</button>
+                <button type="button" onClick={() => { setEditingName(false); setEditValue(file.name) }} className="px-3 py-1.5 text-gray-500 rounded-lg text-sm">취소</button>
+              </>
+            ) : (
+              <>
+                <p className="text-sm font-medium text-gray-800 truncate flex-1 min-w-0">{file.name}</p>
+                <button type="button" onClick={() => { setEditValue(file.name); setEditingName(true) }} className="p-1.5 rounded-lg text-gray-400 hover:bg-gray-100" title="이름 변경"><Pencil className="w-4 h-4" /></button>
+              </>
+            )}
+          </div>
+          {/* 타임라인 */}
+          <div className="text-xs text-gray-500 space-y-1">
+            <p>업로드됨 · {formatDistanceToNow(new Date(file.created_at), { addSuffix: true, locale: ko })}</p>
+            {file.memo_updated_at && <p>메모 저장됨 · {formatDistanceToNow(new Date(file.memo_updated_at), { addSuffix: true, locale: ko })}</p>}
+          </div>
+          {/* 메모 */}
+          <div>
+            <label className="block text-xs font-medium text-gray-500 mb-1">메모</label>
+            <textarea value={memoValue} onChange={(e) => setMemoValue(e.target.value)} placeholder="이 파일에 대한 메모를 적어보세요" rows={3} className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm resize-none focus:outline-none focus:ring-2 focus:ring-brand-400 focus:border-transparent" />
+            <button type="button" onClick={handleSaveMemo} disabled={memoSaving} className="mt-2 px-3 py-1.5 bg-gray-800 text-white rounded-lg text-sm font-medium hover:bg-gray-900 disabled:opacity-50">
+              {memoSaving ? '저장 중…' : '메모 저장'}
+            </button>
+          </div>
+          <div className="flex items-center gap-2 flex-wrap">
+            <button type="button" onClick={() => onDownload(file.storage_path, file.name)} className="flex items-center justify-center gap-2 px-4 py-2 bg-gray-100 text-gray-700 rounded-xl text-sm font-medium hover:bg-gray-200">
+              <Download className="w-4 h-4" /> 다운로드
+            </button>
+            <button onClick={() => onDelete(file.id, file.storage_path)} className="flex items-center justify-center gap-2 px-4 py-2 bg-red-50 text-red-500 rounded-xl text-sm font-medium hover:bg-red-100">
+              <Trash2 className="w-4 h-4" />
+            </button>
+            <button onClick={onClose} className="flex items-center justify-center p-2 bg-gray-100 text-gray-600 rounded-xl hover:bg-gray-200">
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
 }
 
 export default function SecureFolderPage() {
@@ -63,6 +334,13 @@ export default function SecureFolderPage() {
   const [isNewNote, setIsNewNote] = useState(false)
   const [draggedFileId, setDraggedFileId] = useState<string | null>(null)
   const [dragOverFolderId, setDragOverFolderId] = useState<string | null>(null)
+  const [selectedSecurePhoto, setSelectedSecurePhoto] = useState<SecureFile | null>(null)
+  const [selectedSecureVideo, setSelectedSecureVideo] = useState<SecureFile | null>(null)
+  const [selectedSecureFile, setSelectedSecureFile] = useState<SecureFile | null>(null)
+  const [editingFileId, setEditingFileId] = useState<string | null>(null)
+  const [editingFileName, setEditingFileName] = useState('')
+  const [editingFolderId, setEditingFolderId] = useState<string | null>(null)
+  const [editingFolderName, setEditingFolderName] = useState('')
   const supabase = createClient()
 
   const DRAG_FILE_KEY = 'application/x-secure-file-id'
@@ -150,7 +428,7 @@ export default function SecureFolderPage() {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return
     setFilesLoading(true)
-    const selectCols = 'id, name, storage_path, size_bytes, mime_type, created_at, file_type, folder_id'
+    const selectCols = 'id, name, storage_path, size_bytes, mime_type, created_at, file_type, folder_id, memo, memo_updated_at'
     const { data, error } = await supabase
       .from('files')
       .select(selectCols)
@@ -164,7 +442,7 @@ export default function SecureFolderPage() {
         .eq('owner_id', user.id)
         .eq('is_secure', true)
         .order('created_at', { ascending: false })
-      setSecureFiles((dataWithoutFolder || []).map((f) => ({ ...f, folder_id: null })))
+      setSecureFiles((dataWithoutFolder || []).map((f) => ({ ...f, folder_id: null, memo: null, memo_updated_at: null })))
       if (error.message?.includes('folder_id')) toast.info('폴더 기능을 쓰려면 Supabase에서 add_secure_folders.sql을 실행해주세요.')
     } else if (error) {
       toast.error('파일 목록을 불러오지 못했어요. is_secure 컬럼이 있으면 add_is_secure.sql을 실행해주세요.')
@@ -246,6 +524,37 @@ export default function SecureFolderPage() {
     if (selectedFileFolderId === folderId) setSelectedFileFolderId(null)
     fetchSecureFolders()
     fetchSecureFiles()
+  }
+
+  async function renameSecureFile(fileId: string, newName: string) {
+    const { error } = await supabase.from('files').update({ name: newName }).eq('id', fileId)
+    if (error) return toast.error('이름 변경 실패')
+    toast.success('이름이 변경되었어요')
+    fetchSecureFiles()
+    setSelectedSecurePhoto((p) => (p?.id === fileId ? { ...p, name: newName } : p))
+    setSelectedSecureVideo((v) => (v?.id === fileId ? { ...v, name: newName } : v))
+  }
+
+  async function renameSecureFolder(folderId: string, newName: string) {
+    const { error } = await supabase.from('secure_folders').update({ name: newName }).eq('id', folderId)
+    if (error) return toast.error('이름 변경 실패')
+    toast.success('폴더 이름이 변경되었어요')
+    fetchSecureFolders()
+  }
+
+  async function openSecureFile(path: string) {
+    const url = await getSignedFileUrl('family-files', path, 300)
+    if (url) window.open(url, '_blank')
+    else toast.error('파일을 열 수 없어요')
+  }
+
+  async function updateSecureFileMemo(fileId: string, memo: string) {
+    const now = new Date().toISOString()
+    const { error } = await supabase.from('files').update({ memo: memo || null, memo_updated_at: memo ? now : null }).eq('id', fileId)
+    if (error) return toast.error('메모 저장 실패')
+    setSecureFiles((prev) => prev.map((f) => (f.id === fileId ? { ...f, memo: memo || null, memo_updated_at: memo ? now : null } : f)))
+    if (selectedSecureFile?.id === fileId) setSelectedSecureFile((f) => (f && f.id === fileId ? { ...f, memo: memo || null, memo_updated_at: memo ? now : null } : f))
+    toast.success('메모가 저장되었어요')
   }
 
   async function saveSecureNote() {
@@ -432,11 +741,24 @@ export default function SecureFolderPage() {
                           >
                             <button onClick={() => setSelectedFileFolderId(folder.id)} className="flex-1 flex items-center gap-3 text-left min-w-0">
                               <div className="w-12 h-12 rounded-xl bg-amber-50 flex items-center justify-center flex-shrink-0"><FolderOpen className="w-6 h-6 text-amber-600" /></div>
-                              <div className="min-w-0">
-                                <p className="font-medium text-gray-800 truncate">{folder.name}</p>
-                                <p className="text-xs text-gray-400">{count}개 파일</p>
+                              <div className="min-w-0 flex-1">
+                                {editingFolderId === folder.id ? (
+                                  <div className="flex gap-1" onClick={(e) => e.stopPropagation()}>
+                                    <input type="text" value={editingFolderName} onChange={(e) => setEditingFolderName(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') { renameSecureFolder(folder.id, editingFolderName.trim()); setEditingFolderId(null) } if (e.key === 'Escape') setEditingFolderId(null) }} className="flex-1 px-2 py-0.5 border border-gray-200 rounded text-sm min-w-0" autoFocus />
+                                    <button type="button" onClick={() => { renameSecureFolder(folder.id, editingFolderName.trim()); setEditingFolderId(null) }} className="text-xs text-brand-600 font-medium">저장</button>
+                                    <button type="button" onClick={() => setEditingFolderId(null)} className="text-xs text-gray-500">취소</button>
+                                  </div>
+                                ) : (
+                                  <>
+                                    <p className="font-medium text-gray-800 truncate">{folder.name}</p>
+                                    <p className="text-xs text-gray-400">{count}개 파일</p>
+                                  </>
+                                )}
                               </div>
                             </button>
+                            {editingFolderId !== folder.id && (
+                              <button onClick={(e) => { e.stopPropagation(); setEditingFolderId(folder.id); setEditingFolderName(folder.name) }} className="p-2 rounded-lg text-gray-400 hover:text-brand-600 hover:bg-brand-50 opacity-0 group-hover:opacity-100" title="이름 변경"><Pencil className="w-4 h-4" /></button>
+                            )}
                             <button onClick={() => deleteFolder(folder.id)} className="p-2 rounded-lg text-gray-400 hover:text-red-500 hover:bg-red-50 opacity-0 group-hover:opacity-100"> <Trash2 className="w-4 h-4" /> </button>
                           </div>
                         )
@@ -466,21 +788,40 @@ export default function SecureFolderPage() {
                         draggable
                         onDragStart={(e) => { e.dataTransfer.setData(DRAG_FILE_KEY, f.id); e.dataTransfer.effectAllowed = 'move'; setDraggedFileId(f.id) }}
                         onDragEnd={() => { setDraggedFileId(null); setDragOverFolderId(null) }}
-                        className={`bg-white rounded-2xl border border-gray-100 overflow-hidden hover:shadow-md transition-all flex flex-col group cursor-grab active:cursor-grabbing ${draggedFileId === f.id ? 'opacity-50' : ''}`}
+                        onClick={() => setSelectedSecureFile(f)}
+                        className={`bg-white rounded-2xl border border-gray-100 overflow-hidden hover:shadow-md transition-all flex flex-col group cursor-pointer ${draggedFileId === f.id ? 'opacity-50' : ''}`}
                       >
-                        <div className="aspect-square min-h-[140px] bg-gray-50 flex items-center justify-center relative">
-                          <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-gray-100 to-gray-50"><span className="text-5xl">{getFileIcon(f.mime_type)}</span></div>
-                          <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors flex items-center justify-end gap-1 p-2 opacity-0 group-hover:opacity-100">
-                            <select className="text-xs rounded-lg border border-gray-200 bg-white px-2 py-1.5 text-gray-600" value="" onChange={(e) => { const v = e.target.value; moveFileToFolder(f.id, v || null); e.target.value = '' }} title="폴더로 이동">
-                              <option value="">이동...</option>
-                              <option value="">📁 폴더 없음</option>
-                              {secureFolders.map((fd) => <option key={fd.id} value={fd.id}>📁 {fd.name}</option>)}
-                            </select>
-                            <a href={getFileUrl('family-files', f.storage_path)} download={f.name} className="p-2 rounded-lg bg-white/90 text-gray-700 hover:bg-white shadow"><Download className="w-4 h-4" /></a>
-                            <button onClick={() => deleteSecureFile(f.id, f.storage_path)} className="p-2 rounded-lg bg-white/90 text-red-500 hover:bg-white shadow"><Trash2 className="w-4 h-4" /></button>
+                        <div className="aspect-square min-h-[140px] bg-gray-50 flex items-center justify-center relative overflow-hidden">
+                          <div className="absolute inset-0 w-full h-full flex items-center justify-center bg-gradient-to-br from-gray-100 to-gray-50">
+                            <DocumentThumbnail bucket="family-files" storagePath={f.storage_path} mimeType={f.mime_type} fallback={<span className="text-5xl">{getFileIcon(f.mime_type)}</span>} className="w-full h-full" />
+                          </div>
+                          <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors flex items-end justify-end gap-1 p-3 opacity-0 group-hover:opacity-100 pointer-events-none">
+                            <span className="pointer-events-auto flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+                              <button type="button" onClick={(e) => { e.stopPropagation(); setEditingFileId(f.id); setEditingFileName(f.name) }} className="p-2 rounded-lg bg-white/90 text-gray-700 hover:bg-white shadow" title="이름 변경"><Pencil className="w-4 h-4" /></button>
+                              <select className="text-xs rounded-lg border border-gray-200 bg-white px-2 py-1.5 text-gray-600" value="" onChange={(e) => { e.stopPropagation(); const v = e.target.value; moveFileToFolder(f.id, v || null); e.target.value = '' }} title="폴더로 이동">
+                                <option value="">이동...</option>
+                                <option value="">📁 폴더 없음</option>
+                                {secureFolders.map((fd) => <option key={fd.id} value={fd.id}>📁 {fd.name}</option>)}
+                              </select>
+                              <SecureDownloadLink path={f.storage_path} fileName={f.name} className="p-2 rounded-lg bg-white/90 text-gray-700 hover:bg-white shadow"><Download className="w-4 h-4" /></SecureDownloadLink>
+                              <button type="button" onClick={(e) => { e.stopPropagation(); deleteSecureFile(f.id, f.storage_path) }} className="p-2 rounded-lg bg-white/90 text-red-500 hover:bg-white shadow"><Trash2 className="w-4 h-4" /></button>
+                            </span>
                           </div>
                         </div>
-                        <div className="p-3 min-w-0"><p className="text-sm font-medium text-gray-800 truncate" title={f.name}>{f.name}</p><p className="text-xs text-gray-400 mt-0.5">{formatFileSize(f.size_bytes)} · {formatDistanceToNow(new Date(f.created_at), { addSuffix: true, locale: ko })}</p></div>
+                        <div className="px-4 py-3 min-w-0 border-t border-gray-50" onClick={editingFileId === f.id ? (e) => e.stopPropagation() : undefined}>
+                          {editingFileId === f.id ? (
+                            <div className="flex gap-1">
+                              <input type="text" value={editingFileName} onChange={(e) => setEditingFileName(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') { renameSecureFile(f.id, editingFileName.trim()); setEditingFileId(null) } if (e.key === 'Escape') setEditingFileId(null) }} className="flex-1 px-2 py-0.5 border border-gray-200 rounded text-sm min-w-0" autoFocus />
+                              <button type="button" onClick={() => { renameSecureFile(f.id, editingFileName.trim()); setEditingFileId(null) }} className="text-xs text-brand-600 font-medium shrink-0">저장</button>
+                              <button type="button" onClick={() => setEditingFileId(null)} className="text-xs text-gray-500 shrink-0">취소</button>
+                            </div>
+                          ) : (
+                            <>
+                              <p className="text-sm text-gray-700 truncate font-normal tracking-tight" title={f.name}>{f.name}</p>
+                              <p className="text-xs text-gray-400 mt-1">{formatFileSize(f.size_bytes)} · {formatDistanceToNow(new Date(f.created_at), { addSuffix: true, locale: ko })}</p>
+                            </>
+                          )}
+                        </div>
                       </div>
                     ))}
                   </div>
@@ -514,16 +855,7 @@ export default function SecureFolderPage() {
             ) : (
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
                 {secureByType.photos.map((f) => (
-                  <div key={f.id} className="bg-white rounded-2xl border border-gray-100 overflow-hidden hover:shadow-md transition-shadow flex flex-col">
-                    <div className="aspect-square min-h-[140px] bg-gray-50 flex items-center justify-center relative group">
-                      <img src={getFileUrl('family-files', f.storage_path)} alt="" className="w-full h-full object-cover" />
-                      <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors flex items-center justify-end gap-1 p-2 opacity-0 group-hover:opacity-100">
-                        <a href={getFileUrl('family-files', f.storage_path)} download={f.name} className="p-2 rounded-lg bg-white/90 text-gray-700 hover:bg-white shadow"><Download className="w-4 h-4" /></a>
-                        <button onClick={() => deleteSecureFile(f.id, f.storage_path)} className="p-2 rounded-lg bg-white/90 text-red-500 hover:bg-white shadow"><Trash2 className="w-4 h-4" /></button>
-                      </div>
-                    </div>
-                    <div className="p-3 min-w-0"><p className="text-sm font-medium text-gray-800 truncate" title={f.name}>{f.name}</p><p className="text-xs text-gray-400 mt-0.5">{formatFileSize(f.size_bytes)} · {formatDistanceToNow(new Date(f.created_at), { addSuffix: true, locale: ko })}</p></div>
-                  </div>
+                  <SecurePhotoCard key={f.id} f={f} onSelect={(file) => setSelectedSecurePhoto(file)} onDownload={async (path, name) => { await triggerDownload(path, name); toast.success('다운로드됨'); }} onDelete={deleteSecureFile} />
                 ))}
               </div>
             )}
@@ -554,16 +886,7 @@ export default function SecureFolderPage() {
             ) : (
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
                 {secureByType.videos.map((f) => (
-                  <div key={f.id} className="bg-white rounded-2xl border border-gray-100 overflow-hidden hover:shadow-md transition-shadow flex flex-col">
-                    <div className="aspect-video min-h-[120px] bg-gray-900 flex items-center justify-center relative group">
-                      <video src={getFileUrl('family-files', f.storage_path)} preload="metadata" className="w-full h-full object-cover" muted playsInline />
-                      <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors flex items-center justify-end gap-1 p-2 opacity-0 group-hover:opacity-100">
-                        <a href={getFileUrl('family-files', f.storage_path)} download={f.name} className="p-2 rounded-lg bg-white/90 text-gray-700 hover:bg-white shadow"><Download className="w-4 h-4" /></a>
-                        <button onClick={() => deleteSecureFile(f.id, f.storage_path)} className="p-2 rounded-lg bg-white/90 text-red-500 hover:bg-white shadow"><Trash2 className="w-4 h-4" /></button>
-                      </div>
-                    </div>
-                    <div className="p-3 min-w-0"><p className="text-sm font-medium text-gray-800 truncate" title={f.name}>{f.name}</p><p className="text-xs text-gray-400 mt-0.5">{formatFileSize(f.size_bytes)} · {formatDistanceToNow(new Date(f.created_at), { addSuffix: true, locale: ko })}</p></div>
-                  </div>
+                  <SecureVideoCard key={f.id} f={f} onSelect={(file) => setSelectedSecureVideo(file)} onDownload={async (path, name) => { await triggerDownload(path, name); toast.success('다운로드됨'); }} onDelete={deleteSecureFile} />
                 ))}
               </div>
             )}
@@ -611,6 +934,38 @@ export default function SecureFolderPage() {
               </div>
             )}
           </>
+        )}
+
+        {/* 보안 폴더 사진 확대 모달 */}
+        {selectedSecurePhoto && (
+          <SecurePhotoModal
+            file={selectedSecurePhoto}
+            onClose={() => setSelectedSecurePhoto(null)}
+            onDownload={async (path, name) => { await triggerDownload(path, name); toast.success('다운로드됨'); }}
+            onDelete={(id, path) => { deleteSecureFile(id, path); setSelectedSecurePhoto(null); }}
+            onRename={renameSecureFile}
+          />
+        )}
+        {/* 보안 폴더 동영상 확대 모달 */}
+        {selectedSecureVideo && (
+          <SecureVideoModal
+            file={selectedSecureVideo}
+            onClose={() => setSelectedSecureVideo(null)}
+            onDownload={async (path, name) => { await triggerDownload(path, name); toast.success('다운로드됨'); }}
+            onDelete={(id, path) => { deleteSecureFile(id, path); setSelectedSecureVideo(null); }}
+            onRename={renameSecureFile}
+          />
+        )}
+        {/* 보안 폴더 문서/일반 파일 모달 */}
+        {selectedSecureFile && (
+          <SecureFileModal
+            file={selectedSecureFile}
+            onClose={() => setSelectedSecureFile(null)}
+            onDownload={async (path, name) => { await triggerDownload(path, name); toast.success('다운로드됨'); }}
+            onDelete={(id, path) => { deleteSecureFile(id, path); setSelectedSecureFile(null); }}
+            onRename={renameSecureFile}
+            onSaveMemo={updateSecureFileMemo}
+          />
         )}
 
         {/* 메모 편집 모달 */}

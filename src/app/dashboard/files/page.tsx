@@ -332,16 +332,16 @@ export default function FilesPage() {
       ) : (
         <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
           {/* 헤더 */}
-          <div className="grid grid-cols-[1fr_70px_88px_140px] gap-4 px-4 py-2.5 border-b border-gray-100 text-xs font-medium text-gray-400">
+          <div className="grid grid-cols-[1fr_56px_96px_200px] gap-3 px-4 py-2.5 border-b border-gray-100 text-xs font-medium text-gray-400">
             <span>파일명</span>
-            <span className="text-left">크기</span>
-            <span className="text-left">날짜</span>
-            <span className="text-right">폴더 / 액션</span>
+            <span className="text-center">크기</span>
+            <span className="text-center">날짜</span>
+            <span className="flex items-center justify-end pr-[8.75rem]">폴더 선택</span>
           </div>
           {displayFiles.map((file) => (
             <div
               key={file.id}
-              className="grid grid-cols-[1fr_70px_88px_140px] gap-4 items-center px-4 py-3 border-b border-gray-50 last:border-0 hover:bg-gray-50 transition-colors file-row"
+              className="grid grid-cols-[1fr_56px_96px_200px] gap-3 items-center px-4 py-3 border-b border-gray-50 last:border-0 hover:bg-gray-50 transition-colors file-row"
             >
               <div className="flex items-center gap-3 min-w-0">
                 <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 text-base ${getIconBg(file.mime_type)}`}>
@@ -365,8 +365,8 @@ export default function FilesPage() {
                   </p>
                 </div>
               </div>
-              <span className="text-xs text-gray-400 text-left">{formatFileSize(file.size_bytes)}</span>
-              <span className="text-xs text-gray-400 text-left">
+              <span className="text-xs text-gray-400 text-center">{formatFileSize(file.size_bytes)}</span>
+              <span className="text-xs text-gray-400 text-center">
                 {formatDistanceToNow(new Date(file.created_at), { addSuffix: true, locale: ko })}
               </span>
               <div className="flex items-center justify-end gap-1">
@@ -374,7 +374,7 @@ export default function FilesPage() {
                   className="text-xs rounded-lg border border-gray-200 bg-white px-2 py-1 text-gray-600"
                   value={file.file_folder_id ?? ''}
                   onChange={(e) => moveFileToFolder(file.id, e.target.value || null)}
-                  title="폴더로 이동"
+                  title="폴더 선택"
                 >
                   <option value="">폴더 없음</option>
                   {fileFolders.map((fd) => <option key={fd.id} value={fd.id}>{fd.name}</option>)}

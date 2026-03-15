@@ -112,8 +112,9 @@ export default function PhotosPage() {
     if (!user) return
     const { data } = await supabase
       .from('photo_folders')
-      .select('id, name, created_at')
+      .select('id, name, created_at, is_secure')
       .eq('owner_id', user.id)
+      .or('is_secure.is.null,is_secure.eq.false')
       .order('created_at', { ascending: true })
     setPhotoFolders(data || [])
   }, [supabase])
@@ -152,7 +153,7 @@ export default function PhotosPage() {
     if (!trimmed) return
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return
-    const { error } = await supabase.from('photo_folders').insert({ owner_id: user.id, name: trimmed })
+    const { error } = await supabase.from('photo_folders').insert({ owner_id: user.id, name: trimmed, is_secure: false })
     if (error) return toast.error('폴더를 만들지 못했어요')
     toast.success('폴더가 만들어졌어요')
     setNewFolderName('')

@@ -603,6 +603,7 @@ export default function SecureFolderPage() {
       .from('photo_folders')
       .select('id, name, created_at')
       .eq('owner_id', user.id)
+      .eq('is_secure', true)
       .order('created_at', { ascending: true })
     setSecurePhotoFolders(data || [])
   }, [supabase])
@@ -654,7 +655,7 @@ export default function SecureFolderPage() {
     if (!name) return toast.error('폴더 이름을 입력하세요')
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return
-    const { error } = await supabase.from('photo_folders').insert({ owner_id: user.id, name })
+    const { error } = await supabase.from('photo_folders').insert({ owner_id: user.id, name, is_secure: true })
     if (error) return toast.error('폴더를 만들지 못했어요')
     toast.success('폴더가 만들어졌어요')
     setNewPhotoFolderName('')

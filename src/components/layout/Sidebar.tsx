@@ -36,10 +36,26 @@ export default function Sidebar({ user, usedBytes = 0, totalBytes = 10 * 1024 * 
   const supabase = createClient()
   const usedPct = Math.round((usedBytes / totalBytes) * 100)
   const [menuOpen, setMenuOpen] = useState(false)
+  const [secureLeaveConfirmOpen, setSecureLeaveConfirmOpen] = useState(false)
+  const [pendingHref, setPendingHref] = useState<string | null>(null)
 
   const navItems = user.email === ADMIN_EMAIL
     ? [...baseNavItems, ...adminOnlyNavItems]
     : baseNavItems
+
+  function handleNavClick(e: React.MouseEvent, href: string) {
+    e.preventDefault()
+    e.stopPropagation()
+    const isInSecure = pathname.startsWith('/dashboard/secure')
+    const isLeavingSecure = isInSecure && !href.startsWith('/dashboard/secure')
+    if (isLeavingSecure) {
+      setPendingHref(href)
+      setSecureLeaveConfirmOpen(true)
+      return
+    }
+    setMenuOpen(false)
+    router.push(href)
+  }
 
   function formatGB(bytes: number) {
     return (bytes / 1024 / 1024 / 1024).toFixed(1)
@@ -67,7 +83,10 @@ export default function Sidebar({ user, usedBytes = 0, totalBytes = 10 * 1024 * 
           {navItems.map(({ href, label, icon: Icon, exact }) => {
             const active = exact ? pathname === href : pathname.startsWith(href)
             return (
-              <Link key={href} href={href}
+              <Link
+                key={href}
+                href={href}
+                onClick={(e) => handleNavClick(e, href)}
                 className={`flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition-colors ${
                   active ? 'bg-brand-50 text-brand-600 font-medium' : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
                 }`}
@@ -121,7 +140,10 @@ export default function Sidebar({ user, usedBytes = 0, totalBytes = 10 * 1024 * 
             {navItems.map(({ href, label, icon: Icon, exact }) => {
               const active = exact ? pathname === href : pathname.startsWith(href)
               return (
-                <Link key={href} href={href} onClick={() => setMenuOpen(false)}
+                <Link
+                  key={href}
+                  href={href}
+                  onClick={(e) => handleNavClick(e, href)}
                   className={`flex items-center gap-3 px-4 py-3 rounded-xl text-sm transition-colors ${
                     active ? 'bg-brand-50 text-brand-600 font-medium' : 'text-gray-600 hover:bg-gray-50'
                   }`}
@@ -151,7 +173,10 @@ export default function Sidebar({ user, usedBytes = 0, totalBytes = 10 * 1024 * 
           {baseNavItems.slice(0, 5).map(({ href, label, icon: Icon, exact }) => {
             const active = exact ? pathname === href : pathname.startsWith(href)
             return (
-              <Link key={href} href={href}
+              <Link
+                key={href}
+                href={href}
+                onClick={(e) => handleNavClick(e, href)}
                 className={`flex flex-col items-center gap-0.5 py-2.5 px-3 transition-colors ${
                   active ? 'text-brand-600' : 'text-gray-400'
                 }`}
@@ -163,6 +188,47 @@ export default function Sidebar({ user, usedBytes = 0, totalBytes = 10 * 1024 * 
           })}
         </div>
       </div>
+
+      {/* 보안 폴더 이탈 확인 모달 */}
+      {secureLeaveConfirmOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4"
+          onClick={() => setSecureLeaveConfirmOpen(false)}
+        >
+          <div
+            className="w-full max-w-xs bg-white rounded-2xl shadow-xl p-4 space-y-3"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <p className="text-sm font-semibold text-gray-900">보안 폴더에서 나가시겠습니까?</p>
+            <p className="text-xs text-gray-500">
+              나가면 다시 들어올 때 2차 비밀번호를 재입력 하셔야 합니다.
+            </p>
+            <div className="flex gap-2 pt-1">
+              <button
+                type="button"
+                onClick={() => setSecureLeaveConfirmOpen(false)}
+                className="flex-1 py-2.5 text-sm font-medium text-gray-600 bg-gray-100 rounded-xl hover:bg-gray-200"
+              >
+                취소
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  if (pendingHref) {
+                    setSecureLeaveConfirmOpen(false)
+                    setMenuOpen(false)
+                    router.push(pendingHref)
+                    setPendingHref(null)
+                  }
+                }}
+                className="flex-1 py-2.5 text-sm font-medium text-white bg-brand-600 rounded-xl hover:bg-brand-800"
+              >
+                나가기
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   )
 }

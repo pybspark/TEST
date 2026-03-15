@@ -20,7 +20,7 @@ export async function POST(req: NextRequest) {
 
   const { data: folder, error: folderError } = await supabase
     .from('photo_folders')
-    .select('id')
+    .select('id, is_secure')
     .eq('id', folderId)
     .eq('owner_id', user.id)
     .single()

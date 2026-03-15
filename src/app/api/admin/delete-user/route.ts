@@ -20,6 +20,9 @@ export async function POST(req: NextRequest) {
     { auth: { autoRefreshToken: false, persistSession: false } }
   )
 
+  // 그룹 멤버십 먼저 제거 (관리자 목록에서 제거 = 그룹에서도 제거)
+  await adminClient.from('family_members').delete().eq('user_id', userId)
+
   const { error } = await adminClient.auth.admin.deleteUser(userId)
   if (error) return NextResponse.json({ error: error.message }, { status: 400 })
   return NextResponse.json({ success: true })

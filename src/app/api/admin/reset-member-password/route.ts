@@ -21,27 +21,35 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: '비밀번호는 6자 이상이어야 합니다' }, { status: 400 })
   }
 
-  // 요청자가 그룹 소유자인지, 대상이 같은 그룹 멤버인지 확인
-  const { data: myMember } = await supabase
-    .from('family_members')
-    .select('group_id')
-    .eq('user_id', user.id)
-    .eq('role', 'owner')
-    .maybeSingle()
+  const ADMIN_EMAIL = 'pybspark@gmail.com'
+  const isSuperAdmin = user.email === ADMIN_EMAIL
 
-  if (!myMember?.group_id) {
-    return NextResponse.json({ error: '그룹 관리자만 멤버 비밀번호를 재설정할 수 있습니다' }, { status: 403 })
+  let allowed = false
+  if (isSuperAdmin) {
+    // 관리자 페이지: 모든 가입자 비밀번호 재설정 가능
+    allowed = true
+  } else {
+    // 그룹 관리: 요청자가 그룹 소유자이고 대상이 같은 그룹 멤버인지 확인
+    const { data: myMember } = await supabase
+      .from('family_members')
+      .select('group_id')
+      .eq('user_id', user.id)
+      .eq('role', 'owner')
+      .maybeSingle()
+
+    if (myMember?.group_id) {
+      const { data: targetMember } = await supabase
+        .from('family_members')
+        .select('user_id')
+        .eq('group_id', myMember.group_id)
+        .eq('user_id', targetUserId)
+        .maybeSingle()
+      allowed = !!targetMember
+    }
   }
 
-  const { data: targetMember } = await supabase
-    .from('family_members')
-    .select('user_id')
-    .eq('group_id', myMember.group_id)
-    .eq('user_id', targetUserId)
-    .maybeSingle()
-
-  if (!targetMember) {
-    return NextResponse.json({ error: '해당 사용자는 이 그룹의 멤버가 아닙니다' }, { status: 403 })
+  if (!allowed) {
+    return NextResponse.json({ error: '비밀번호 재설정 권한이 없습니다' }, { status: 403 })
   }
 
   const adminClient = createClient(

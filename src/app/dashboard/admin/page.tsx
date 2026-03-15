@@ -2,7 +2,8 @@ import { createServerSupabase } from '@/lib/supabase-server'
 import { redirect } from 'next/navigation'
 import { formatDistanceToNow } from 'date-fns'
 import { ko } from 'date-fns/locale'
-import { Image, Video, FileText, StickyNote } from 'lucide-react'
+import { Image, Video, FileText } from 'lucide-react'
+import AdminSubscriberList from './AdminSubscriberList'
 
 // ⚠️ 여기에 본인 이메일 입력
 const ADMIN_EMAIL = 'pybspark@gmail.com'
@@ -68,30 +69,11 @@ export default async function AdminPage() {
 
       {/* 가입자 목록 */}
       <h2 className="text-sm font-semibold text-gray-700 mb-3">가입자 목록</h2>
-      <div className="bg-white border border-gray-100 rounded-2xl overflow-hidden mb-8">
-        {profiles?.map((profile, idx) => {
-          const userFiles = allFiles?.filter(f => f.owner_id === profile.id) || []
-          const userNotes = allNotes?.filter(n => n.owner_id === profile.id) || []
-          const avatarColors = ['bg-blue-100 text-blue-700','bg-green-100 text-green-700','bg-pink-100 text-pink-700','bg-purple-100 text-purple-700']
-          return (
-            <div key={profile.id} className="flex items-center gap-3 px-4 py-3 border-b border-gray-50 last:border-0">
-              <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-semibold flex-shrink-0 ${avatarColors[idx % 4]}`}>
-                {(profile.name || profile.email || '?').slice(0,1)}
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-gray-800">{profile.name || '이름 없음'}
-                  {profile.email === ADMIN_EMAIL && <span className="ml-1.5 text-xs bg-red-50 text-red-500 px-1.5 py-0.5 rounded-md">관리자</span>}
-                </p>
-                <p className="text-xs text-gray-400">{profile.email}</p>
-              </div>
-              <div className="flex gap-3 text-xs text-gray-400">
-                <span>📁 {userFiles.length}개</span>
-                <span>📝 {userNotes.length}개</span>
-              </div>
-            </div>
-          )
-        })}
-      </div>
+      <AdminSubscriberList
+        profiles={profiles || []}
+        allFiles={allFiles || []}
+        allNotes={allNotes || []}
+      />
 
       {/* 최근 업로드 전체 */}
       <h2 className="text-sm font-semibold text-gray-700 mb-3">최근 업로드 전체</h2>

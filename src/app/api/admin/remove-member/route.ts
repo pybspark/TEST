@@ -1,4 +1,5 @@
 import { createServerSupabase } from '@/lib/supabase-server'
+import { createClient } from '@supabase/supabase-js'
 import { NextRequest, NextResponse } from 'next/server'
 
 export async function POST(req: NextRequest) {
@@ -44,13 +45,24 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: '관리자는 그룹에서 제거할 수 없습니다' }, { status: 403 })
   }
 
-  const { error } = await supabase
+  // RLS를 거치지 않고 삭제하기 위해 서비스 역할 클라이언트 사용 (권한 검증은 위에서 완료)
+  const adminClient = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+    { auth: { autoRefreshToken: false, persistSession: false } }
+  )
+
+  const { data: deleted, error } = await adminClient
     .from('family_members')
     .delete()
     .eq('id', targetMember.id)
+    .select('id')
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 400 })
+  }
+  if (!deleted?.length) {
+    return NextResponse.json({ error: '멤버 제거에 실패했습니다. 다시 시도해 주세요.' }, { status: 400 })
   }
   return NextResponse.json({ success: true })
 }

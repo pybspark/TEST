@@ -1,7 +1,7 @@
 'use client'
 import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase'
-import { Users, Copy, UserPlus, Crown, CheckCircle, Share2, KeyRound } from 'lucide-react'
+import { Users, Copy, UserPlus, Crown, CheckCircle, Share2, KeyRound, UserMinus } from 'lucide-react'
 import { toast } from 'sonner'
 
 interface Member {
@@ -39,6 +39,8 @@ export default function FamilyPage() {
   const [resetPassword, setResetPassword] = useState('')
   const [resetPasswordConfirm, setResetPasswordConfirm] = useState('')
   const [resetLoading, setResetLoading] = useState(false)
+  const [removeTargetMember, setRemoveTargetMember] = useState<Member | null>(null)
+  const [removeLoading, setRemoveLoading] = useState(false)
   const supabase = createClient()
 
   async function fetchData() {
@@ -162,6 +164,28 @@ export default function FamilyPage() {
     }
   }
 
+  async function submitRemoveMember() {
+    if (!removeTargetMember) return
+    setRemoveLoading(true)
+    try {
+      const res = await fetch('/api/admin/remove-member', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: removeTargetMember.user_id }),
+      })
+      const data = await res.json()
+      if (!res.ok) {
+        toast.error(data.error || '제거 실패')
+        return
+      }
+      toast.success('그룹에서 제거되었습니다')
+      setRemoveTargetMember(null)
+      fetchData()
+    } finally {
+      setRemoveLoading(false)
+    }
+  }
+
   const isOwner = members.some((m) => m.user_id === currentUserId && m.role === 'owner')
   const avatarColors = ['bg-blue-100 text-blue-700', 'bg-green-100 text-green-700', 'bg-pink-100 text-pink-700', 'bg-purple-100 text-purple-700']
 
@@ -282,15 +306,26 @@ export default function FamilyPage() {
                   <>
                     <span className="text-xs text-gray-400">구성원</span>
                     {isOwner && (
-                      <button
-                        type="button"
-                        onClick={() => setResetTargetMember(member)}
-                        className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-brand-700 bg-brand-50 rounded-lg hover:bg-brand-100 transition-colors border border-brand-200"
-                        title="비밀번호 재설정"
-                      >
-                        <KeyRound className="w-3.5 h-3.5" />
-                        비밀번호 재설정
-                      </button>
+                      <>
+                        <button
+                          type="button"
+                          onClick={() => setResetTargetMember(member)}
+                          className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-brand-700 bg-brand-50 rounded-lg hover:bg-brand-100 transition-colors border border-brand-200"
+                          title="비밀번호 재설정"
+                        >
+                          <KeyRound className="w-3.5 h-3.5" />
+                          비밀번호 재설정
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setRemoveTargetMember(member)}
+                          className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-red-700 bg-red-50 rounded-lg hover:bg-red-100 transition-colors border border-red-200"
+                          title="그룹에서 제거"
+                        >
+                          <UserMinus className="w-3.5 h-3.5" />
+                          그룹에서 제거
+                        </button>
+                      </>
                     )}
                   </>
                 )}
@@ -319,6 +354,35 @@ export default function FamilyPage() {
                 <CheckCircle className="w-4 h-4 text-green-500 flex-shrink-0" />
               </div>
             ))}
+          </div>
+        </div>
+      )}
+
+      {/* 그룹에서 제거 확인 모달 */}
+      {removeTargetMember && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50" onClick={() => !removeLoading && setRemoveTargetMember(null)}>
+          <div className="w-full max-w-sm bg-white rounded-2xl p-5 shadow-xl space-y-4" onClick={(e) => e.stopPropagation()}>
+            <h3 className="text-sm font-semibold text-gray-800">그룹에서 제거</h3>
+            <p className="text-xs text-gray-500">
+              <span className="font-medium text-gray-700">{removeTargetMember.profiles?.name || removeTargetMember.profiles?.email}</span> 님을 그룹에서 제거하시겠어요? 제거된 멤버는 다시 초대 코드로 참여할 수 있습니다.
+            </p>
+            <div className="flex gap-2 pt-1">
+              <button
+                type="button"
+                onClick={() => !removeLoading && setRemoveTargetMember(null)}
+                className="flex-1 py-2.5 text-sm font-medium text-gray-600 bg-gray-100 rounded-xl hover:bg-gray-200 transition-colors"
+              >
+                취소
+              </button>
+              <button
+                type="button"
+                onClick={submitRemoveMember}
+                disabled={removeLoading}
+                className="flex-1 py-2.5 text-sm font-medium text-white bg-red-600 rounded-xl hover:bg-red-700 transition-colors disabled:opacity-50"
+              >
+                {removeLoading ? '처리 중…' : '제거'}
+              </button>
+            </div>
           </div>
         </div>
       )}

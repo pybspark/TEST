@@ -58,21 +58,31 @@ export default function AdminSubscriberList({ profiles, allFiles, allNotes }: Ad
 
   async function submitRemoveFromGroups() {
     if (!removeTarget) return
+    const userIdToRemove = removeTarget.id
     setRemoveLoading(true)
     try {
+      const controller = new AbortController()
+      const timeoutId = setTimeout(() => controller.abort(), 15000)
       const res = await fetch('/api/admin/remove-from-groups', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId: removeTarget.id }),
+        body: JSON.stringify({ userId: userIdToRemove }),
+        signal: controller.signal,
       })
-      const data = await res.json()
+      clearTimeout(timeoutId)
+      const data = await res.json().catch(() => ({}))
       if (!res.ok) {
         toast.error(data.error || '제거 실패')
+        setRemoveTarget(null)
         return
       }
       toast.success('그룹에서 제거되었습니다. 같은 아이디로 초대 코드로 재가입할 수 있습니다.')
       setRemoveTarget(null)
       window.location.reload()
+    } catch (err) {
+      const isAbort = err instanceof Error && err.name === 'AbortError'
+      toast.error(isAbort ? '요청 시간이 초과되었습니다. 다시 시도해 주세요.' : '네트워크 오류가 발생했습니다. 다시 시도해 주세요.')
+      setRemoveTarget(null)
     } finally {
       setRemoveLoading(false)
     }

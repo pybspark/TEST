@@ -26,36 +26,44 @@ export default function LoginPage() {
         router.push('/dashboard')
         router.refresh()
       } else {
-        // 초대 코드 확인
-        const { data: group } = await supabase
-          .from('family_groups')
-          .select('id, name')
-          .eq('invite_code', inviteCode.trim())
-          .single()
-
-        if (!group) {
-          toast.error('올바르지 않은 초대 코드예요')
+        // 전역 초대 코드 확인 (관리자 발급 코드, 그룹 배정은 나중에 관리자가 함)
+        const validateRes = await fetch('/api/validate-invite-code', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ code: inviteCode.trim() }),
+        })
+        const validateData = await validateRes.json().catch(() => ({}))
+        if (!validateData.valid) {
+          toast.error('올바르지 않거나 이미 사용된 초대 코드예요')
           setLoading(false)
           return
         }
 
-        // 가입 진행
+        const codeToUse = inviteCode.trim()
+
+        // 가입 진행 (그룹에는 넣지 않음)
         const { data: signUpData, error } = await supabase.auth.signUp({
           email, password,
           options: { data: { name } }
         })
         if (error) throw error
 
-        // 가족 그룹에 자동 추가
+        // 발급된 초대 코드 사용 처리 (1회 사용, 가입 직후라 세션 없을 수 있어 이메일 전달)
         if (signUpData.user) {
-          await supabase.from('family_members').insert({
-            group_id: group.id,
-            user_id: signUpData.user.id,
-            role: 'member',
+          const useRes = await fetch('/api/use-invite-code', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ code: codeToUse, email: signUpData.user.email }),
           })
+          if (!useRes.ok) {
+            const useData = await useRes.json().catch(() => ({}))
+            toast.error(useData.error || '초대 코드 사용 처리에 실패했어요')
+            setLoading(false)
+            return
+          }
         }
 
-        toast.success(`"${group.name}"에 참여했어요! 로그인해주세요 🎉`)
+        toast.success('가입되었어요! 로그인해 주세요. 그룹은 관리자가 배정해 드릴 거예요 🎉')
         setMode('login')
       }
     } catch (err: any) {
@@ -150,7 +158,7 @@ export default function LoginPage() {
 
         {mode === 'signup' && (
           <p className="text-center text-xs text-gray-400 mt-4">
-            초대 코드는 관리 페이지에서 확인할 수 있어요
+            초대 코드는 관리자가 발급합니다. 가입 후 그룹은 관리자가 배정해 드려요
           </p>
         )}
       </div>

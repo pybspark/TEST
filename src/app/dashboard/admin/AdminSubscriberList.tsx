@@ -1,20 +1,29 @@
 'use client'
 
 import { useState } from 'react'
-import { KeyRound, UserMinus, Trash2 } from 'lucide-react'
+import { KeyRound, UserMinus, Trash2, UserPlus } from 'lucide-react'
 import { toast } from 'sonner'
 
 type Profile = { id: string; name: string | null; email: string | null }
 type FileRow = { owner_id: string }
 type NoteRow = { owner_id: string }
+type GroupOption = { id: string; name: string }
 
 interface AdminSubscriberListProps {
   profiles: Profile[]
   allFiles: FileRow[]
   allNotes: NoteRow[]
+  memberships?: Record<string, { groupId: string; groupName: string }[]>
+  adminGroups?: GroupOption[]
 }
 
-export default function AdminSubscriberList({ profiles, allFiles, allNotes }: AdminSubscriberListProps) {
+export default function AdminSubscriberList({
+  profiles,
+  allFiles,
+  allNotes,
+  memberships = {},
+  adminGroups = [],
+}: AdminSubscriberListProps) {
   const [resetTarget, setResetTarget] = useState<Profile | null>(null)
   const [newPassword, setNewPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
@@ -23,6 +32,9 @@ export default function AdminSubscriberList({ profiles, allFiles, allNotes }: Ad
   const [removeLoading, setRemoveLoading] = useState(false)
   const [deleteTarget, setDeleteTarget] = useState<Profile | null>(null)
   const [deleteLoading, setDeleteLoading] = useState(false)
+  const [assignTarget, setAssignTarget] = useState<Profile | null>(null)
+  const [assignGroupId, setAssignGroupId] = useState('')
+  const [assignLoading, setAssignLoading] = useState(false)
 
   const avatarColors = ['bg-blue-100 text-blue-700', 'bg-green-100 text-green-700', 'bg-pink-100 text-pink-700', 'bg-purple-100 text-purple-700']
   const ADMIN_EMAIL = 'pybspark@gmail.com'
@@ -90,6 +102,31 @@ export default function AdminSubscriberList({ profiles, allFiles, allNotes }: Ad
     }
   }
 
+  async function submitAssignGroup() {
+    if (!assignTarget || !assignGroupId) return
+    setAssignLoading(true)
+    try {
+      const res = await fetch('/api/admin/assign-group', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: assignTarget.id, groupId: assignGroupId }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        toast.error(data.error || '배정 실패')
+        return
+      }
+      toast.success('그룹에 배정되었습니다')
+      setAssignTarget(null)
+      setAssignGroupId('')
+      window.location.reload()
+    } catch {
+      toast.error('네트워크 오류')
+    } finally {
+      setAssignLoading(false)
+    }
+  }
+
   async function submitDeleteAccount() {
     if (!deleteTarget) return
     const userIdToDelete = deleteTarget.id
@@ -123,8 +160,10 @@ export default function AdminSubscriberList({ profiles, allFiles, allNotes }: Ad
         {profiles.map((profile, idx) => {
           const userFiles = allFiles.filter(f => f.owner_id === profile.id)
           const userNotes = allNotes.filter(n => n.owner_id === profile.id)
+          const groups = memberships[profile.id] ?? []
+          const noGroup = groups.length === 0
           return (
-            <div key={profile.id} className="flex items-center gap-3 px-4 py-3 border-b border-gray-50 last:border-0">
+            <div key={profile.id} className="flex items-center gap-3 px-4 py-3 border-b border-gray-50 last:border-0 flex-wrap">
               <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-semibold flex-shrink-0 ${avatarColors[idx % 4]}`}>
                 {(profile.name || profile.email || '?').slice(0, 1)}
               </div>
@@ -136,10 +175,29 @@ export default function AdminSubscriberList({ profiles, allFiles, allNotes }: Ad
                   )}
                 </p>
                 <p className="text-xs text-gray-400">{profile.email}</p>
+                {groups.length > 0 && (
+                  <p className="text-xs text-gray-500 mt-0.5">
+                    소속: {groups.map((g) => g.groupName).join(', ')}
+                  </p>
+                )}
+                {noGroup && profile.email !== ADMIN_EMAIL && (
+                  <p className="text-xs text-amber-600 mt-0.5">그룹 미배정</p>
+                )}
               </div>
               <div className="flex gap-2 text-xs text-gray-400 items-center flex-wrap">
                 <span>📁 {userFiles.length}개</span>
                 <span>📝 {userNotes.length}개</span>
+                {noGroup && profile.email !== ADMIN_EMAIL && adminGroups.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => { setAssignTarget(profile); setAssignGroupId(adminGroups[0]?.id ?? '') }}
+                    className="flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium text-white bg-brand-600 rounded-lg hover:bg-brand-700"
+                    title="그룹 배정"
+                  >
+                    <UserPlus className="w-3.5 h-3.5" />
+                    그룹 배정
+                  </button>
+                )}
                 <button
                   type="button"
                   onClick={() => setResetTarget(profile)}
@@ -176,6 +234,43 @@ export default function AdminSubscriberList({ profiles, allFiles, allNotes }: Ad
           )
         })}
       </div>
+
+      {assignTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50" onClick={() => !assignLoading && setAssignTarget(null)}>
+          <div className="w-full max-w-sm bg-white rounded-2xl p-5 shadow-xl space-y-4" onClick={e => e.stopPropagation()}>
+            <h3 className="text-sm font-semibold text-gray-800">그룹 배정</h3>
+            <p className="text-xs text-gray-500">
+              <span className="font-medium text-gray-700">{assignTarget.name || assignTarget.email}</span> 님을 넣을 그룹을 선택하세요.
+            </p>
+            <select
+              value={assignGroupId}
+              onChange={e => setAssignGroupId(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-brand-400"
+            >
+              {adminGroups.map(g => (
+                <option key={g.id} value={g.id}>{g.name}</option>
+              ))}
+            </select>
+            <div className="flex gap-2 pt-1">
+              <button
+                type="button"
+                onClick={() => !assignLoading && setAssignTarget(null)}
+                className="flex-1 py-2.5 text-sm font-medium text-gray-600 bg-gray-100 rounded-xl hover:bg-gray-200"
+              >
+                취소
+              </button>
+              <button
+                type="button"
+                onClick={submitAssignGroup}
+                disabled={assignLoading}
+                className="flex-1 py-2.5 text-sm font-medium text-white bg-brand-600 rounded-xl hover:bg-brand-700 disabled:opacity-50"
+              >
+                {assignLoading ? '처리 중…' : '배정'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {resetTarget && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50" onClick={() => !loading && setResetTarget(null)}>

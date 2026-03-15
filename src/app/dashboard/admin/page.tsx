@@ -18,18 +18,38 @@ export default async function AdminPage() {
     redirect('/dashboard')
   }
 
-  // 그룹에 속한 user_id 목록 (그룹에서 제거하면 이 목록에서 사라짐)
-  const { data: familyMemberRows } = await supabase
-    .from('family_members')
-    .select('user_id')
-  const groupMemberIds = [...new Set((familyMemberRows || []).map((r) => r.user_id))]
-
-  // 가입자 목록 = 그룹에 속한 사람만 (그룹에서 제거하면 목록에서 탈퇴)
+  // 전체 가입자 (초대코드로 가입한 사람 모두, 그룹 유무와 무관)
   const { data: allProfiles } = await supabase
     .from('profiles')
     .select('*')
     .order('created_at', { ascending: false })
-  const profiles = (allProfiles || []).filter((p) => groupMemberIds.includes(p.id))
+  const profiles = allProfiles || []
+
+  // user_id별 소속 그룹 (family_members + family_groups 이름)
+  const { data: familyMemberRows } = await supabase
+    .from('family_members')
+    .select('user_id, group_id, family_groups(name)')
+  const memberships: Record<string, { groupId: string; groupName: string }[]> = {}
+  for (const row of familyMemberRows || []) {
+    const r = row as { user_id: string; group_id: string; family_groups: { name: string } | { name: string }[] | null }
+    const groupName = Array.isArray(r.family_groups)
+      ? r.family_groups[0]?.name ?? '그룹'
+      : r.family_groups?.name ?? '그룹'
+    if (!memberships[r.user_id]) memberships[r.user_id] = []
+    memberships[r.user_id].push({ groupId: r.group_id, groupName })
+  }
+
+  // 관리자가 owner인 그룹 목록 (그룹 배정 드롭다운용)
+  const { data: myOwnerRows } = await supabase
+    .from('family_members')
+    .select('group_id')
+    .eq('user_id', user.id)
+    .eq('role', 'owner')
+  const ownerGroupIds = (myOwnerRows || []).map((r) => r.group_id).filter(Boolean)
+  const { data: adminGroups } = ownerGroupIds.length > 0
+    ? await supabase.from('family_groups').select('id, name').in('id', ownerGroupIds).order('name')
+    : { data: [] }
+  const groupsForAssign = adminGroups || []
 
   // 전체 파일
   const { data: allFiles } = await supabase
@@ -47,18 +67,6 @@ export default async function AdminPage() {
 
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
 
-  // 관리자(owner)인 그룹의 초대 코드 (관리자 페이지에서 표시·재생성)
-  const { data: adminGroup } = await supabase
-    .from('family_members')
-    .select('group_id')
-    .eq('user_id', user.id)
-    .eq('role', 'owner')
-    .maybeSingle()
-  const { data: groupRow } = adminGroup
-    ? await supabase.from('family_groups').select('invite_code').eq('id', adminGroup.group_id).maybeSingle()
-    : { data: null }
-  const inviteCode = groupRow?.invite_code ?? null
-
   return (
     <div className="p-6 max-w-5xl mx-auto">
       <div className="flex items-center gap-3 mb-6">
@@ -75,7 +83,7 @@ export default async function AdminPage() {
       <div className="grid grid-cols-3 gap-3 mb-8">
         <div className="bg-white border border-gray-100 rounded-xl p-4">
           <p className="text-2xl font-bold text-gray-900">{profiles?.length || 0}</p>
-          <p className="text-xs text-gray-500 mt-1">그룹 멤버 (가입자 목록)</p>
+          <p className="text-xs text-gray-500 mt-1">전체 가입자</p>
         </div>
         <div className="bg-white border border-gray-100 rounded-xl p-4">
           <p className="text-2xl font-bold text-gray-900">{allFiles?.length || 0}</p>
@@ -87,15 +95,17 @@ export default async function AdminPage() {
         </div>
       </div>
 
-      {/* 초대 코드 (버튼으로 새 코드 생성 가능) */}
-      <AdminInviteCode initialInviteCode={inviteCode} />
+      {/* 초대 코드 (가입용 랜덤 발급, 그룹 배정은 아래 목록에서) */}
+      <AdminInviteCode />
 
-      {/* 가입자 목록 (그룹에 속한 사람만, 그룹에서 제거하면 여기서 사라짐) */}
-      <h2 className="text-sm font-semibold text-gray-700 mb-3">가입자 목록</h2>
+      {/* 가입자 목록 (전체) + 그룹 미배정 시 배정 UI */}
+      <h2 className="text-sm font-semibold text-gray-700 mb-3">가입자 목록 · 그룹 배정</h2>
       <AdminSubscriberList
-        profiles={profiles || []}
+        profiles={profiles}
         allFiles={allFiles || []}
         allNotes={allNotes || []}
+        memberships={memberships}
+        adminGroups={groupsForAssign}
       />
 
       {/* 최근 업로드 전체 */}

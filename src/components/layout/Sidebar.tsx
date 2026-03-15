@@ -11,12 +11,12 @@ const ADMIN_EMAIL = 'pybspark@gmail.com'
 const baseNavItems = [
   { href: '/dashboard', label: '홈', icon: HardDrive, exact: true },
   { href: '/dashboard/secure', label: '보안 폴더', icon: Lock },
+  { href: '/dashboard/shared', label: '공유 폴더', icon: Share2 },
   { href: '/dashboard/photos', label: '사진', icon: Image },
   { href: '/dashboard/files', label: '파일', icon: FileText },
-  { href: '/dashboard/trash', label: '휴지통', icon: Trash2 },
   { href: '/dashboard/videos', label: '영상', icon: Video },
   { href: '/dashboard/notes', label: '메모', icon: StickyNote },
-  { href: '/dashboard/shared', label: '공유됨', icon: Share2 },
+  { href: '/dashboard/trash', label: '휴지통', icon: Trash2 },
 ]
 
 const adminOnlyNavItems = [

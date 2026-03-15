@@ -83,7 +83,7 @@ export default function SharedPage() {
   if (groups.length === 0) {
     return (
       <div className="p-6">
-        <h1 className="text-xl font-bold text-gray-900 mb-1">공유됨</h1>
+        <h1 className="text-xl font-bold text-gray-900 mb-1">공유 폴더</h1>
         <p className="text-sm text-gray-500 mb-6">그룹에 공유된 사진, 영상, 파일, 메모를 한곳에서 볼 수 있어요</p>
         <div className="bg-white rounded-2xl border border-dashed border-gray-200 p-12 text-center">
           <Share2 className="w-10 h-10 text-gray-300 mx-auto mb-3" />
@@ -143,7 +143,7 @@ export default function SharedPage() {
   return (
     <div className="p-6">
       <div className="mb-6">
-        <h1 className="text-xl font-bold text-gray-900">공유됨</h1>
+        <h1 className="text-xl font-bold text-gray-900">공유 폴더</h1>
         <p className="text-sm text-gray-500 mt-0.5">
           그룹에 공유된 항목 {totalCount > 0 && `총 ${totalCount}개`}
         </p>

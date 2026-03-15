@@ -42,6 +42,7 @@ export default function NotesPage() {
       .from('notes')
       .select('*, profiles(name)')
       .eq('owner_id', user.id)
+      .or('is_secure.eq.false,is_secure.is.null')
       .order('pinned', { ascending: false })
       .order('updated_at', { ascending: false })
     setNotes(data || [])
@@ -80,6 +81,7 @@ export default function NotesPage() {
         pinned: editing.pinned,
         is_shared: editing.is_shared,
         group_id: editing.group_id,
+        is_secure: false,
       }).select().single()
       if (data) toast.success('메모가 저장되었습니다')
     } else {

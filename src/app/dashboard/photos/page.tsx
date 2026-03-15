@@ -35,6 +35,7 @@ export default function PhotosPage() {
       .select('*, profiles(name)')
       .eq('owner_id', user.id)
       .eq('file_type', 'photo')
+      .or('is_secure.eq.false,is_secure.is.null')
       .order('created_at', { ascending: false })
     setPhotos(data || [])
     setLoading(false)

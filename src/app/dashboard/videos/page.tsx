@@ -36,6 +36,7 @@ export default function VideosPage() {
       .select('*, profiles(name)')
       .eq('owner_id', user.id)
       .eq('file_type', 'video')
+      .or('is_secure.eq.false,is_secure.is.null')
       .order('created_at', { ascending: false })
     setVideos(data || [])
     setLoading(false)

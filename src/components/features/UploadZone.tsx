@@ -16,6 +16,7 @@ interface UploadZoneProps {
   accept?: Record<string, string[]>
   bucket?: string
   fileType?: 'photo' | 'video' | 'file'
+  isSecure?: boolean
 }
 
 export default function UploadZone({
@@ -23,6 +24,7 @@ export default function UploadZone({
   accept,
   bucket = 'family-files',
   fileType = 'file',
+  isSecure = false,
 }: UploadZoneProps) {
   const [items, setItems] = useState<UploadItem[]>([])
   const [uploading, setUploading] = useState(false)
@@ -71,15 +73,26 @@ export default function UploadZone({
       }
 
       // DB에 파일 정보 저장
-      await supabase.from('files').insert({
+      const { error: insertError } = await supabase.from('files').insert({
         owner_id: user.id,
         name: item.file.name,
         storage_path: path,
         file_type: fileType,
         mime_type: item.file.type,
         size_bytes: item.file.size,
+        is_secure: isSecure,
       })
 
+      if (insertError) {
+        setItems((prev) =>
+          prev.map((x) => x.file === item.file ? { ...x, status: 'error' } : x)
+        )
+        const msg = insertError.message?.includes('is_secure') || insertError.message?.includes('column')
+          ? 'DB에 is_secure 컬럼이 없을 수 있어요. Supabase SQL에서 add_is_secure.sql 실행해주세요.'
+          : `저장 실패: ${item.file.name}`
+        toast.error(msg)
+        continue
+      }
       setItems((prev) =>
         prev.map((x) => x.file === item.file ? { ...x, status: 'done', progress: 100 } : x)
       )

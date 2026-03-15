@@ -55,8 +55,8 @@ export default function SharedPage() {
         .eq('is_shared', true)
         .in('group_id', groupIds)
         .order('created_at', { ascending: false })
-      setSharedFiles(files || [])
-      setSharedNotes(notes || [])
+      setSharedFiles((files || []) as unknown as SharedFile[])
+      setSharedNotes((notes || []) as unknown as SharedNote[])
       setLoading(false)
     }
     if (!groupsLoading) fetchShared()

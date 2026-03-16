@@ -165,14 +165,14 @@ export default async function DashboardPage() {
                       FileText
 
                     return (
-                      <li key={f.id} className="flex items-center gap-2 text-[11px] text-gray-900">
+                      <li key={f.id} className="flex items-center gap-2 text-[13px] text-gray-900">
                         <div className={`w-8 h-8 rounded-lg flex flex-col items-center justify-center text-[10px] flex-shrink-0 ${iconBg}`}>
                           <Icon className="w-3.5 h-3.5 mb-0.5" />
                           <span className="leading-none">{typeLabel}</span>
                         </div>
                         <div className="flex-1 min-w-0 flex items-center justify-between gap-2">
                           <span className="truncate">{f.name}</span>
-                          <span className="text-[10px] text-gray-400 flex-shrink-0">
+                          <span className="text-[12px] text-gray-400 flex-shrink-0">
                             {formatDistanceToNow(new Date(f.created_at), { addSuffix: true, locale: ko })}
                           </span>
                         </div>

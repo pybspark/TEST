@@ -1,22 +1,50 @@
 'use client'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { Cloud, Image, FileText, Video, StickyNote, Users, LogOut, HardDrive, Share2, Crown, Menu, X, Lock, Trash2 } from 'lucide-react'
+import { Cloud, Image, FileText, Video, StickyNote, Users, LogOut, HardDrive, Share2, Crown, Menu, X, Lock, Trash2, Calendar } from 'lucide-react'
 import { createClient } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
 import { useState } from 'react'
 
 const ADMIN_EMAIL = 'pybspark@gmail.com'
 
-const baseNavItems = [
-  { href: '/dashboard', label: '홈', icon: HardDrive, exact: true },
-  { href: '/dashboard/secure', label: '보안 폴더', icon: Lock },
-  { href: '/dashboard/shared', label: '공유 폴더', icon: Share2 },
-  { href: '/dashboard/photos', label: '사진', icon: Image },
-  { href: '/dashboard/files', label: '파일', icon: FileText },
-  { href: '/dashboard/videos', label: '영상', icon: Video },
-  { href: '/dashboard/notes', label: '메모', icon: StickyNote },
-  { href: '/dashboard/trash', label: '휴지통', icon: Trash2 },
+type NavItem = { href: string; label: string; icon: any; exact?: boolean }
+
+const baseNavSections: { title: string; items: NavItem[] }[] = [
+  {
+    title: '홈',
+    items: [
+      { href: '/dashboard', label: '홈', icon: HardDrive, exact: true },
+    ],
+  },
+  {
+    title: '보안 폴더',
+    items: [
+      { href: '/dashboard/secure', label: '보안 폴더', icon: Lock },
+    ],
+  },
+  {
+    title: '콘텐츠',
+    items: [
+      { href: '/dashboard/photos', label: '사진', icon: Image },
+      { href: '/dashboard/files', label: '파일', icon: FileText },
+      { href: '/dashboard/videos', label: '영상', icon: Video },
+      { href: '/dashboard/notes', label: '메모', icon: StickyNote },
+      { href: '/dashboard/calendar', label: '캘린더', icon: Calendar },
+    ],
+  },
+  {
+    title: '공유된 폴더',
+    items: [
+      { href: '/dashboard/shared', label: '공유된 폴더', icon: Share2 },
+    ],
+  },
+  {
+    title: '관리',
+    items: [
+      { href: '/dashboard/trash', label: '휴지통', icon: Trash2 },
+    ],
+  },
 ]
 
 const adminOnlyNavItems = [
@@ -39,9 +67,9 @@ export default function Sidebar({ user, usedBytes = 0, totalBytes = 10 * 1024 * 
   const [secureLeaveConfirmOpen, setSecureLeaveConfirmOpen] = useState(false)
   const [pendingHref, setPendingHref] = useState<string | null>(null)
 
-  const navItems = user.email === ADMIN_EMAIL
-    ? [...baseNavItems, ...adminOnlyNavItems]
-    : baseNavItems
+  const navSections = user.email === ADMIN_EMAIL
+    ? [...baseNavSections, { title: '관리자', items: adminOnlyNavItems as NavItem[] }]
+    : baseNavSections
 
   function handleNavClick(e: React.MouseEvent, href: string) {
     e.preventDefault()
@@ -79,23 +107,49 @@ export default function Sidebar({ user, usedBytes = 0, totalBytes = 10 * 1024 * 
             <span className="font-semibold text-gray-900 text-sm">BIN CLOUD</span>
           </div>
         </div>
-        <nav className="flex-1 px-3 py-2 space-y-0.5 overflow-y-auto">
-          {navItems.map(({ href, label, icon: Icon, exact }) => {
-            const active = exact ? pathname === href : pathname.startsWith(href)
-            return (
-              <Link
-                key={href}
-                href={href}
-                onClick={(e) => handleNavClick(e, href)}
-                className={`flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition-colors ${
-                  active ? 'bg-brand-50 text-brand-600 font-medium' : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
-                }`}
-              >
-                <Icon className="w-4 h-4 flex-shrink-0" />
-                {label}
-              </Link>
-            )
-          })}
+        <nav className="flex-1 px-3 py-3 overflow-y-auto space-y-3">
+          {navSections.map((section) => (
+            <div
+              key={section.title}
+              className={`rounded-2xl border shadow-sm px-2 py-2 ${
+                section.title === '보안 폴더'
+                  ? 'bg-gradient-to-b from-amber-50/80 to-white border-amber-200 shadow-[0_10px_30px_rgba(245,158,11,0.15)]'
+                  : 'bg-gray-50/70 border-gray-100'
+              }`}
+            >
+              <p className="px-2 pt-1 pb-2 text-[11px] font-semibold text-gray-500 tracking-wide">
+                <span className="inline-flex items-center gap-1.5">
+                  {section.title === '보안 폴더' && (
+                    <span className="inline-flex items-center px-1.5 py-0.5 rounded-md text-[10px] font-semibold bg-amber-100 text-amber-800">
+                      SECURE
+                    </span>
+                  )}
+                  {section.title}
+                </span>
+              </p>
+              <div className="space-y-0.5">
+                {section.items.map(({ href, label, icon: Icon, exact }) => {
+                  const active = exact ? pathname === href : pathname.startsWith(href)
+                  const isSecureItem = section.title === '보안 폴더'
+                  return (
+                    <Link
+                      key={href}
+                      href={href}
+                      onClick={(e) => handleNavClick(e, href)}
+                      className={`flex items-center gap-2.5 px-3 py-2 rounded-xl text-sm transition-colors ${
+                        active
+                          ? (isSecureItem ? 'bg-white text-amber-700 font-semibold shadow-sm' : 'bg-white text-brand-600 font-medium shadow-sm')
+                          : (isSecureItem ? 'text-gray-700 hover:bg-white hover:shadow-sm hover:text-amber-700' : 'text-gray-600 hover:bg-white hover:shadow-sm hover:text-gray-900')
+                      }`}
+                    >
+                      <Icon className={`w-4 h-4 flex-shrink-0 ${isSecureItem ? 'text-amber-600' : ''}`} />
+                      {label}
+                    </Link>
+                  )
+                })}
+              </div>
+            </div>
+          ))}
         </nav>
         <div className="p-4 border-t border-gray-100 space-y-3">
           <div className="flex items-center justify-between">
@@ -156,22 +210,29 @@ export default function Sidebar({ user, usedBytes = 0, totalBytes = 10 * 1024 * 
         <div className="md:hidden fixed inset-0 z-30 bg-black/40" onClick={() => setMenuOpen(false)}>
           <div className="absolute top-14 left-0 right-0 bg-white border-b border-gray-100 p-3 space-y-1"
             onClick={(e) => e.stopPropagation()}>
-            {navItems.map(({ href, label, icon: Icon, exact }) => {
-              const active = exact ? pathname === href : pathname.startsWith(href)
-              return (
-                <Link
-                  key={href}
-                  href={href}
-                  onClick={(e) => handleNavClick(e, href)}
-                  className={`flex items-center gap-3 px-4 py-3 rounded-xl text-sm transition-colors ${
-                    active ? 'bg-brand-50 text-brand-600 font-medium' : 'text-gray-600 hover:bg-gray-50'
-                  }`}
-                >
-                  <Icon className="w-4 h-4 flex-shrink-0" />
-                  {label}
-                </Link>
-              )
-            })}
+            {navSections.map((section) => (
+              <div key={section.title} className="rounded-2xl bg-gray-50/70 border border-gray-100 shadow-sm overflow-hidden">
+                <p className="px-4 py-2 text-[11px] font-semibold text-gray-500 tracking-wide">{section.title}</p>
+                <div className="px-1 pb-2 space-y-1">
+                  {section.items.map(({ href, label, icon: Icon, exact }) => {
+                    const active = exact ? pathname === href : pathname.startsWith(href)
+                    return (
+                      <Link
+                        key={href}
+                        href={href}
+                        onClick={(e) => handleNavClick(e, href)}
+                        className={`flex items-center gap-3 px-4 py-3 rounded-xl text-sm transition-colors ${
+                          active ? 'bg-white text-brand-600 font-medium shadow-sm' : 'text-gray-600 hover:bg-white hover:shadow-sm'
+                        }`}
+                      >
+                        <Icon className="w-4 h-4 flex-shrink-0" />
+                        {label}
+                      </Link>
+                    )
+                  })}
+                </div>
+              </div>
+            ))}
             <div className="border-t border-gray-100 mt-2 pt-2 px-4 pb-1 flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-gray-800">{user.name || '사용자'}</p>
@@ -189,7 +250,7 @@ export default function Sidebar({ user, usedBytes = 0, totalBytes = 10 * 1024 * 
       {/* ===== 모바일 하단 탭바 ===== */}
       <div className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white border-t border-gray-100 px-2 pb-safe">
         <div className="flex items-center justify-around">
-          {baseNavItems.slice(0, 5).map(({ href, label, icon: Icon, exact }) => {
+          {baseNavSections.flatMap((s) => s.items).slice(0, 5).map(({ href, label, icon: Icon, exact }) => {
             const active = exact ? pathname === href : pathname.startsWith(href)
             return (
               <Link

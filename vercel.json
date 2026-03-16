@@ -1,0 +1,9 @@
+{
+  "crons": [
+    {
+      "path": "/api/cron/send-calendar-reminders",
+      "schedule": "*/5 * * * *"
+    }
+  ]
+}
+

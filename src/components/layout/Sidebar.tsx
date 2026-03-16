@@ -18,9 +18,9 @@ const baseNavSections: { title: string; items: NavItem[] }[] = [
     ],
   },
   {
-    title: '보안 폴더',
+    title: '보안폴더',
     items: [
-      { href: '/dashboard/secure', label: '보안 폴더', icon: Lock },
+      { href: '/dashboard/secure', label: '보안폴더', icon: Lock },
     ],
   },
   {
@@ -112,14 +112,14 @@ export default function Sidebar({ user, usedBytes = 0, totalBytes = 10 * 1024 * 
             <div
               key={section.title}
               className={`rounded-2xl border shadow-sm px-2 py-2 ${
-                section.title === '보안 폴더'
+                section.title === '보안폴더'
                   ? 'bg-gradient-to-b from-amber-50/80 to-white border-amber-200 shadow-[0_10px_30px_rgba(245,158,11,0.15)]'
                   : 'bg-gray-50/70 border-gray-100'
               }`}
             >
               <p className="px-2 pt-1 pb-2 text-[11px] font-semibold text-gray-500 tracking-wide">
                 <span className="inline-flex items-center gap-1.5">
-                  {section.title === '보안 폴더' && (
+                  {section.title === '보안폴더' && (
                     <span className="inline-flex items-center px-1.5 py-0.5 rounded-md text-[10px] font-semibold bg-amber-100 text-amber-800">
                       SECURE
                     </span>
@@ -130,7 +130,7 @@ export default function Sidebar({ user, usedBytes = 0, totalBytes = 10 * 1024 * 
               <div className="space-y-0.5">
                 {section.items.map(({ href, label, icon: Icon, exact }) => {
                   const active = exact ? pathname === href : pathname.startsWith(href)
-                  const isSecureItem = section.title === '보안 폴더'
+                  const isSecureItem = section.title === '보안폴더'
                   return (
                     <Link
                       key={href}

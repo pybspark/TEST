@@ -86,6 +86,18 @@ function parseLocalDateTime(dateStr: string, timeStr: string) {
   return new Date(y, (m || 1) - 1, d || 1, hh || 0, mm || 0, 0, 0)
 }
 
+function formatTimeLabel(dateIso: string, allDay: boolean) {
+  if (allDay) return '하루 종일'
+  const d = new Date(dateIso)
+  const h = d.getHours()
+  const m = d.getMinutes()
+  const isAm = h < 12
+  const hour12 = h % 12 === 0 ? 12 : h % 12
+  const mm = String(m).padStart(2, '0')
+  const period = isAm ? '오전' : '오후'
+  return `${period} ${hour12}:${mm}`
+}
+
 export default function CalendarPage() {
   const supabase = createClient()
   const [cursorMonth, setCursorMonth] = useState(() => startOfMonth(new Date()))
@@ -155,13 +167,42 @@ export default function CalendarPage() {
     const out: any[] = []
     for (const ev of source) {
       const rr = ev.repeat_rule as any
+      const baseStart = new Date(ev.start_at)
+      const baseEnd = ev.end_at ? new Date(ev.end_at) : null
+
+      // 반복이 없는 단일 이벤트
       if (!rr || !rr.freq || rr.freq === 'none') {
-        out.push(ev)
+        // 여러 날짜에 걸친 경우(하루 종일이든 아니든): 각 날짜마다 하나씩 표시
+        if (baseEnd && baseEnd > baseStart) {
+          const startDay = new Date(baseStart.getFullYear(), baseStart.getMonth(), baseStart.getDate())
+          const last = new Date(baseEnd.getFullYear(), baseEnd.getMonth(), baseEnd.getDate())
+          let cur = new Date(startDay)
+          let idx = 0
+          while (cur <= last) {
+            if (cur >= range.from && cur <= range.to) {
+              const occStart = new Date(cur)
+              const isFirst = idx === 0
+              const isLast = cur.getTime() === last.getTime()
+              out.push({
+                ...ev,
+                id: `${ev.id}::${yyyyMmDd(occStart)}`,
+                start_at: occStart.toISOString(),
+                end_at: null,
+                _base_id: ev.id,
+                _occurrence_start: occStart.toISOString(),
+                _segment_position: isFirst && isLast ? 'single' : isFirst ? 'start' : isLast ? 'end' : 'middle',
+              })
+            }
+            cur = addDays(cur, 1)
+            idx++
+          }
+        } else {
+          out.push({ ...ev, _segment_position: 'single' })
+        }
         continue
       }
 
-      const baseStart = new Date(ev.start_at)
-      const baseEnd = ev.end_at ? new Date(ev.end_at) : null
+      // 반복 이벤트
       const durationMs = baseEnd ? Math.max(0, baseEnd.getTime() - baseStart.getTime()) : 0
       const until = rr.until ? new Date(rr.until) : null
       const freq = String(rr.freq)
@@ -192,6 +233,7 @@ export default function CalendarPage() {
             end_at: occEnd ? occEnd.toISOString() : null,
             _base_id: ev.id,
             _occurrence_start: occStart.toISOString(),
+            _segment_position: 'single',
           })
         }
         if (freq === 'daily') cur = addDays(cur, 1)
@@ -485,15 +527,15 @@ export default function CalendarPage() {
 
   function chipClass(color: string) {
     switch ((color || '').toLowerCase()) {
-      case 'red': return 'bg-red-50 text-red-700'
-      case 'orange': return 'bg-orange-50 text-orange-700'
-      case 'yellow': return 'bg-yellow-50 text-yellow-800'
-      case 'green': return 'bg-emerald-50 text-emerald-700'
-      case 'blue': return 'bg-brand-50 text-brand-700'
-      case 'purple': return 'bg-violet-50 text-violet-700'
-      case 'pink': return 'bg-pink-50 text-pink-700'
-      case 'gray': return 'bg-gray-100 text-gray-700'
-      default: return 'bg-brand-50 text-brand-700'
+      case 'red': return 'bg-red-50 text-gray-900'
+      case 'orange': return 'bg-orange-50 text-gray-900'
+      case 'yellow': return 'bg-yellow-50 text-gray-900'
+      case 'green': return 'bg-emerald-50 text-gray-900'
+      case 'blue': return 'bg-brand-50 text-gray-900'
+      case 'purple': return 'bg-violet-50 text-gray-900'
+      case 'pink': return 'bg-pink-50 text-gray-900'
+      case 'gray': return 'bg-gray-100 text-gray-900'
+      default: return 'bg-brand-50 text-gray-900'
     }
   }
 
@@ -521,7 +563,7 @@ export default function CalendarPage() {
             <div className="flex items-center justify-between mb-3">
               <p className="text-sm font-semibold text-gray-900 flex items-center gap-2">
                 <CalendarIcon className="w-4 h-4 text-gray-600" />
-                캘린더
+                캘린더 그룹
               </p>
             </div>
 
@@ -551,12 +593,12 @@ export default function CalendarPage() {
             </div>
 
             <div className="border-t border-gray-100 pt-3 space-y-2">
-              <p className="text-xs font-semibold text-gray-700">새 캘린더</p>
+              <p className="text-xs font-semibold text-gray-700">새 그룹 만들기</p>
               <input
                 type="text"
                 value={newCalName}
                 onChange={(e) => setNewCalName(e.target.value)}
-                placeholder="예: 개인, 직장"
+                placeholder="예: 가족, 직장"
                 className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-brand-400"
               />
               <div className="flex gap-2">
@@ -635,21 +677,41 @@ export default function CalendarPage() {
                     {isToday && <span className="w-1.5 h-1.5 rounded-full bg-brand-600" />}
                   </div>
                   <div className="mt-1 space-y-1">
-                    {dayEvents.slice(0, 2).map((ev) => (
-                      <div
-                        key={ev.id}
-                        onClick={(e) => { e.preventDefault(); e.stopPropagation(); openEdit(ev) }}
-                        className={`px-2 py-1 rounded-lg text-[11px] font-medium truncate ${chipClass(ev.color)}`}
-                        title={ev.title}
-                      >
-                        <span className="inline-flex items-center gap-1">
-                          {ev.attachment_url && <LinkIcon className="w-3 h-3" />}
-                          {ev.title}
-                        </span>
-                      </div>
-                    ))}
-                    {dayEvents.length > 2 && (
-                      <p className="text-[10px] text-gray-400">+{dayEvents.length - 2}개 더</p>
+                    {dayEvents.slice(0, 3).map((ev) => {
+                      const seg = (ev as any)._segment_position as string | undefined
+                      const shape =
+                        seg === 'start'
+                          ? 'rounded-l-full'
+                          : seg === 'end'
+                          ? 'rounded-r-full'
+                          : seg === 'middle'
+                          ? 'rounded-none'
+                          : 'rounded-full'
+                      const stretch = seg && seg !== 'single' ? 'w-full -mx-[2px]' : 'w-full'
+                      const timeLabel = formatTimeLabel(ev.start_at, ev.all_day)
+
+                      return (
+                        <div
+                          key={ev.id}
+                          onClick={(e) => { e.preventDefault(); e.stopPropagation(); openEdit(ev) }}
+                          className={`${stretch} px-2.5 py-1.5 text-[11px] font-medium ${chipClass(ev.color)} ${shape} shadow-[0_0_0_1px_rgba(255,255,255,0.6)]`}
+                          title={ev.title}
+                        >
+                          <div className="flex flex-col items-start gap-0.5 leading-tight text-gray-900">
+                            <span className="inline-flex items-center gap-1 max-w-full text-[11px] text-gray-900">
+                              {ev.attachment_url && <LinkIcon className="w-3 h-3 flex-shrink-0" />}
+                              <span className="truncate">{ev.title || '제목 없음'}</span>
+                            </span>
+                            <span className="text-[10px] text-gray-500/80 max-w-full truncate">
+                              {timeLabel}
+                              {ev.notes ? ` · ${ev.notes.slice(0, 10)}${ev.notes.length > 10 ? '…' : ''}` : ''}
+                            </span>
+                          </div>
+                        </div>
+                      )
+                    })}
+                    {dayEvents.length > 3 && (
+                      <p className="text-[10px] text-gray-400">+{dayEvents.length - 3}개 더</p>
                     )}
                   </div>
                 </button>
@@ -664,15 +726,21 @@ export default function CalendarPage() {
       )}
 
       {modalOpen && (
-        <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4" onClick={() => setModalOpen(false)}>
-          <div className="w-full max-w-md bg-white rounded-2xl shadow-xl overflow-hidden" onClick={(e) => e.stopPropagation()}>
-            <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
+        <div
+          className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4"
+          onClick={() => setModalOpen(false)}
+        >
+          <div
+            className="w-full max-w-2xl md:max-w-3xl bg-white rounded-2xl shadow-xl max-h-[90vh] flex flex-col"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between flex-shrink-0">
               <p className="text-sm font-semibold text-gray-900">{editing ? '일정 수정' : '일정 추가'}</p>
               <button type="button" onClick={() => setModalOpen(false)} className="p-2 rounded-lg hover:bg-gray-50 text-gray-500">
                 <X className="w-4 h-4" />
               </button>
             </div>
-            <div className="p-4 space-y-3">
+            <div className="p-4 space-y-3 overflow-y-auto">
               <div>
                 <label className="block text-xs font-medium text-gray-600 mb-1">날짜</label>
                 <div className="grid grid-cols-2 gap-2">
@@ -681,16 +749,25 @@ export default function CalendarPage() {
                     <button
                       type="button"
                       onClick={() => setFormAllDay((v) => !v)}
-                      className={`w-12 h-7 rounded-full transition-colors relative ${formAllDay ? 'bg-gray-900' : 'bg-gray-300'}`}
+                      className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium border transition-colors ${
+                        formAllDay
+                          ? 'bg-gray-900 text-white border-gray-900'
+                          : 'bg-white text-gray-600 border-gray-300'
+                      }`}
                       aria-pressed={formAllDay}
                     >
-                      <span className={`absolute top-0.5 w-6 h-6 rounded-full bg-white transition-transform ${formAllDay ? 'translate-x-5' : 'translate-x-0.5'}`} />
+                      <span
+                        className={`w-2 h-2 rounded-full ${
+                          formAllDay ? 'bg-emerald-300' : 'bg-gray-300'
+                        }`}
+                      />
+                      <span>{formAllDay ? 'ON' : 'OFF'}</span>
                     </button>
                   </div>
 
                   <div>
                     <label className="block text-xs font-medium text-gray-600 mb-1">시작</label>
-                    <div className="flex gap-2">
+                    <div className="flex flex-col sm:flex-row gap-2">
                       <input
                         type="date"
                         value={formStartDate}
@@ -702,14 +779,14 @@ export default function CalendarPage() {
                           type="time"
                           value={formStartTime}
                           onChange={(e) => setFormStartTime(e.target.value)}
-                          className="w-[120px] px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-brand-400"
+                          className="w-full sm:w-[150px] px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-brand-400"
                         />
                       )}
                     </div>
                   </div>
                   <div>
                     <label className="block text-xs font-medium text-gray-600 mb-1">종료</label>
-                    <div className="flex gap-2">
+                    <div className="flex flex-col sm:flex-row gap-2">
                       <input
                         type="date"
                         value={formEndDate}
@@ -721,7 +798,7 @@ export default function CalendarPage() {
                           type="time"
                           value={formEndTime}
                           onChange={(e) => setFormEndTime(e.target.value)}
-                          className="w-[120px] px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-brand-400"
+                          className="w-full sm:w-[150px] px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-brand-400"
                         />
                       )}
                     </div>
@@ -763,27 +840,15 @@ export default function CalendarPage() {
                 />
               </div>
 
-              <div className="grid grid-cols-1 gap-2">
-                <div>
-                  <label className="block text-xs font-medium text-gray-600 mb-1">위치 (선택)</label>
-                  <input
-                    type="text"
-                    value={formLocation}
-                    onChange={(e) => setFormLocation(e.target.value)}
-                    placeholder="예: 강남역"
-                    className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-brand-400"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-gray-600 mb-1">영상통화 링크 (선택)</label>
-                  <input
-                    type="url"
-                    value={formConferenceUrl}
-                    onChange={(e) => setFormConferenceUrl(e.target.value)}
-                    placeholder="예: https://meet.google.com/..."
-                    className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-brand-400"
-                  />
-                </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">위치 (선택)</label>
+                <input
+                  type="text"
+                  value={formLocation}
+                  onChange={(e) => setFormLocation(e.target.value)}
+                  placeholder="예: 강남역"
+                  className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-brand-400"
+                />
               </div>
 
               <div className="grid grid-cols-2 gap-2">

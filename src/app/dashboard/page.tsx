@@ -140,17 +140,45 @@ export default async function DashboardPage() {
                 </div>
               </div>
             </div>
-            <div className="h-20 rounded-xl bg-emerald-50/70 px-3 py-2 overflow-hidden">
+            <div className="h-24 rounded-xl bg-white/70 px-3 py-2 overflow-y-auto border border-gray-100">
               {files.length === 0 ? (
-                <p className="text-[11px] text-emerald-700 mt-1">아직 문서가 없어요</p>
+                <p className="text-[11px] text-gray-600 mt-1">아직 문서가 없어요</p>
               ) : (
-                <ul className="space-y-1.5">
-                  {files.slice(0, 4).map((f) => (
-                    <li key={f.id} className="flex items-center gap-1.5 text-[11px] text-emerald-900 truncate">
-                      <FileText className="w-3 h-3 flex-shrink-0" />
-                      <span className="truncate">{f.name}</span>
-                    </li>
-                  ))}
+                <ul className="space-y-1.5 pr-1">
+                  {files.slice(0, 4).map((f) => {
+                    const ext = (f.name.split('.').pop() || '').toLowerCase()
+                    const isPdf = ext === 'pdf'
+                    const isImage = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'heic'].includes(ext)
+                    const isVideo = ['mp4', 'mov', 'avi', 'mkv', 'webm'].includes(ext)
+
+                    const iconBg =
+                      isPdf ? 'bg-red-50 text-red-600' :
+                      isVideo ? 'bg-purple-50 text-purple-600' :
+                      isImage ? 'bg-blue-50 text-blue-600' :
+                      'bg-gray-100 text-gray-700'
+
+                    const typeLabel = ext ? ext.toUpperCase() : 'FILE'
+
+                    const Icon =
+                      isImage ? Image :
+                      isVideo ? Video :
+                      FileText
+
+                    return (
+                      <li key={f.id} className="flex items-center gap-2 text-[11px] text-gray-900">
+                        <div className={`w-8 h-8 rounded-lg flex flex-col items-center justify-center text-[10px] flex-shrink-0 ${iconBg}`}>
+                          <Icon className="w-3.5 h-3.5 mb-0.5" />
+                          <span className="leading-none">{typeLabel}</span>
+                        </div>
+                        <div className="flex-1 min-w-0 flex items-center justify-between gap-2">
+                          <span className="truncate">{f.name}</span>
+                          <span className="text-[10px] text-gray-400 flex-shrink-0">
+                            {formatDistanceToNow(new Date(f.created_at), { addSuffix: true, locale: ko })}
+                          </span>
+                        </div>
+                      </li>
+                    )
+                  })}
                 </ul>
               )}
             </div>

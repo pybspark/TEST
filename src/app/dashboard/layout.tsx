@@ -23,7 +23,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
   const usedBytes = files?.reduce((sum, f) => sum + (f.size_bytes || 0), 0) || 0
 
   return (
-    <div className="flex min-h-screen bg-gray-50">
+    <div className="flex min-h-screen bg-stone-50">
       <Sidebar
         user={{ email: profile?.email || user.email || '', name: profile?.name }}
         usedBytes={usedBytes}

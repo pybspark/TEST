@@ -1,8 +1,10 @@
 import { createServerSupabase } from '@/lib/supabase-server'
 import { redirect } from 'next/navigation'
+import { formatDistanceToNow } from 'date-fns'
+import { ko } from 'date-fns/locale'
+import { Image, Video, FileText } from 'lucide-react'
 import AdminSubscriberList from './AdminSubscriberList'
 import AdminInviteCode from './AdminInviteCode'
-import AdminRecentUploads from './AdminRecentUploads'
 
 // ⚠️ 여기에 본인 이메일 입력
 const ADMIN_EMAIL = 'pybspark@gmail.com'
@@ -106,8 +108,35 @@ export default async function AdminPage() {
         adminGroups={groupsForAssign}
       />
 
-      {/* 최근 업로드 전체 (토글로 리스트 숨기기/보기, localStorage 저장) */}
-      <AdminRecentUploads allFiles={allFiles || []} supabaseUrl={supabaseUrl || ''} />
+      {/* 최근 업로드 전체 */}
+      <h2 className="text-sm font-semibold text-gray-700 mb-3">최근 업로드 전체</h2>
+      <div className="bg-white border border-gray-100 rounded-2xl overflow-hidden mb-8">
+        {allFiles?.map((file) => {
+          const Icon = file.file_type === 'photo' ? Image : file.file_type === 'video' ? Video : FileText
+          const iconBg = file.file_type === 'photo' ? 'bg-blue-50 text-brand-600' :
+                         file.file_type === 'video' ? 'bg-purple-50 text-purple-600' : 'bg-green-50 text-green-600'
+          const isPhoto = file.file_type === 'photo'
+          const url = `${supabaseUrl}/storage/v1/object/public/family-files/${file.storage_path}`
+          return (
+            <div key={file.id} className="flex items-center gap-3 px-4 py-3 border-b border-gray-50 last:border-0 hover:bg-gray-50">
+              {isPhoto ? (
+                <img src={url} alt={file.name} className="w-8 h-8 rounded-lg object-cover flex-shrink-0" />
+              ) : (
+                <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${iconBg}`}>
+                  <Icon className="w-3.5 h-3.5" />
+                </div>
+              )}
+              <div className="flex-1 min-w-0">
+                <p className="text-sm text-gray-800 truncate">{file.name}</p>
+                <p className="text-xs text-gray-400">{file.profiles?.name || file.profiles?.email}</p>
+              </div>
+              <p className="text-xs text-gray-400 flex-shrink-0">
+                {formatDistanceToNow(new Date(file.created_at), { addSuffix: true, locale: ko })}
+              </p>
+            </div>
+          )
+        })}
+      </div>
 
       {/* 최근 메모 전체 */}
       <h2 className="text-sm font-semibold text-gray-700 mb-3">최근 메모 전체</h2>

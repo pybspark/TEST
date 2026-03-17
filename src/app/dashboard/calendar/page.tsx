@@ -543,7 +543,7 @@ export default function CalendarPage() {
     <div className="p-6 max-w-6xl mx-auto">
       <div className="flex items-center justify-between mb-5">
         <div>
-          <h1 className="text-xl font-bold text-gray-900">캘린더</h1>
+          <h1 className="text-xl font-bold text-gray-900">캘린더 (테스트)</h1>
           <p className="text-sm text-gray-500 mt-0.5">내 일정을 한 눈에 관리하세요</p>
         </div>
         <button

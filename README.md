@@ -102,6 +102,8 @@ src/
 
 ## 🏗 배포 (Vercel 권장)
 
+> 배포 트리거용 변경: 2026-03-18
+
 ```bash
 # Vercel CLI 설치
 npm i -g vercel

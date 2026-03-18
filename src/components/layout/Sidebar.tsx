@@ -4,7 +4,7 @@ import { usePathname } from 'next/navigation'
 import { Cloud, Image, FileText, Video, StickyNote, Users, LogOut, HardDrive, Share2, Crown, Menu, X, Lock, Trash2, Calendar } from 'lucide-react'
 import { createClient } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 
 const ADMIN_EMAIL = 'pybspark@gmail.com'
 
@@ -66,6 +66,15 @@ export default function Sidebar({ user, usedBytes = 0, totalBytes = 10 * 1024 * 
   const [menuOpen, setMenuOpen] = useState(false)
   const [secureLeaveConfirmOpen, setSecureLeaveConfirmOpen] = useState(false)
   const [pendingHref, setPendingHref] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (!menuOpen) return
+    const prevOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    return () => {
+      document.body.style.overflow = prevOverflow
+    }
+  }, [menuOpen])
 
   const navSections = user.email === ADMIN_EMAIL
     ? [...baseNavSections, { title: '관리자', items: adminOnlyNavItems as NavItem[] }]
@@ -208,7 +217,9 @@ export default function Sidebar({ user, usedBytes = 0, totalBytes = 10 * 1024 * 
       {/* 모바일 드로어 메뉴 */}
       {menuOpen && (
         <div className="md:hidden fixed inset-0 z-30 bg-black/40" onClick={() => setMenuOpen(false)}>
-          <div className="absolute top-14 left-0 right-0 bg-white border-b border-gray-100 p-3 space-y-1"
+          <div
+            className="absolute top-14 left-0 right-0 bg-white border-b border-gray-100 p-3 space-y-1 overflow-y-auto overscroll-contain pb-24"
+            style={{ maxHeight: 'calc(100dvh - 3.5rem - 4.5rem)' }}
             onClick={(e) => e.stopPropagation()}>
             {navSections.map((section) => (
               <div key={section.title} className="rounded-2xl bg-gray-50/70 border border-gray-100 shadow-sm overflow-hidden">
